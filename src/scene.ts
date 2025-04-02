@@ -1,6 +1,6 @@
-import { generateAirfoil } from './core';
+import { Vector2NacaFoil } from './vector';
 import * as THREE from 'three';
-import {NacaCode} from './types';
+import { NacaCode } from './types';
 
 // Create Three.js scene
 export class NacaFoilScene {
@@ -11,9 +11,8 @@ export class NacaFoilScene {
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        const points = generateAirfoil(camber, naca_code);
-        const validPoints = points.filter((point): point is THREE.Vector2 => point !== undefined);
-        const shape = new THREE.Shape(validPoints);
+        const foil = new Vector2NacaFoil(camber, naca_code);
+        const shape = new THREE.Shape(foil.getVectors());
         const geometry = new THREE.ExtrudeGeometry(shape, { depth: 10, bevelEnabled: false });
         const material = new THREE.MeshStandardMaterial({ 
             color: 0xF0F0FF, 
@@ -25,6 +24,7 @@ export class NacaFoilScene {
 
         scene.add(mesh);
         camera.position.z = 200;
+
         // Plane geometry
 
         const width = 1024;
@@ -50,7 +50,7 @@ export class NacaFoilScene {
         positionAttribute.needsUpdate = true;
 
         plane.position.y = 0;
-        plane.rotation.set(90,0,0);
+        plane.rotation.set((Math.PI * 2) / 3,0,0);
 
         scene.add(plane);
         // End plane geo
@@ -97,7 +97,7 @@ export class NacaFoilScene {
 
         function animate() {
             requestAnimationFrame(animate);
-            //mesh.rotation.y += 0.001;
+            mesh.rotation.y += 0.001;
             renderer.render(scene, camera);
         }
         animate();

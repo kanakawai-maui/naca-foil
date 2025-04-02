@@ -11,7 +11,7 @@ export default defineConfig({
       minify: 'terser',
       lib: {
         entry: resolve(__dirname, 'src/index.ts'),
-        name: 'NacaFoilScene',
+        name: 'NacaFoil',
         formats: ['es', 'umd', 'iife', 'cjs'],
         fileName: format => `naca-foil.${format}.js`,
       },
@@ -21,9 +21,9 @@ export default defineConfig({
 * naca-foil v${pkg.version}
 * https://github.com/kanakawai-maui/naca-foil
 */`,
-          footer: `if (globalThis.NacaFoilScene) {
-  for (const key of Object.keys(globalThis.NacaFoilScene)) {
-    globalThis[key] = globalThis.NacaFoilScene[key];
+          footer: `if (globalThis.NacaFoil) {
+  for (const key of Object.keys(globalThis.NacaFoil)) {
+    globalThis[key] = globalThis.NacaFoil[key];
   }
 }`,
         },
