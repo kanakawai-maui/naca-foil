@@ -8,6 +8,11 @@ export class NacaFoilMath {
                 (0.3516 * Math.pow((x / c), 2)) + (0.2843 * Math.pow((x / c), 3)) -
                 ((closeAirfoils ? 0.1036 : 0.1015) * Math.pow((x / c), 4)));
         }
+
+        // Helper method to calculate the cross product of vectors
+        static cross(o: [number, number], a: [number, number], b: [number, number]): number {
+            return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+        }
     
         static camber(x: number, c: number, m: number, p: number) {
             return (x <= (p * c)) ?
@@ -32,22 +37,62 @@ export class NacaFoilMath {
                 (x - (NacaFoilMath.foilY(x, c, t) * Math.sin(NacaFoilMath.theta(x, c, m, p)))) :
                 (x + (NacaFoilMath.foilY(x, c, t) * Math.sin(NacaFoilMath.theta(x, c, m, p))));
         }
+
+        static convexHull(points: [number, number][]) {
+            // Sort points by x-coordinate
+            points.sort((a, b) => a[0] - b[0]);
+
+            // Create lower hull
+            let lower: [number, number][] = [];
+            for (let i = 0; i < points.length; i++) {
+                while (lower.length >= 2 && NacaFoilMath.cross(lower[lower.length - 2], lower[lower.length - 1], points[i]) <= 0) {
+                    lower.pop();
+                }
+                lower.push(points[i]);
+            }
+
+            // Create upper hull
+            let upper: [number, number][] = [];
+            for (let i = points.length - 1; i >= 0; i--) {
+                while (upper.length >= 2 && NacaFoilMath.cross(upper[upper.length - 2], upper[upper.length - 1], points[i]) <= 0) {
+                    upper.pop();
+                }
+                upper.push(points[i]);
+            }
+
+            // Ensure leading edge connection
+            for (let i = 0; i < points.length; i++) {
+                let leadingEdgeXUpper = points[i][0];
+                let leadingEdgeYUpper = points[i][1];
+                let leadingEdgeXLower = points[i][0];
+                let leadingEdgeYLower = points[i][1];
+
+                // Add both upper and lower leading edge points
+                lower.push([leadingEdgeXUpper, leadingEdgeYUpper]);
+                upper.push([leadingEdgeXLower, leadingEdgeYLower]);
+            }
+
+            // Remove the last point of each half because it's repeated at the beginning of the other half
+            upper.pop();
+            lower.pop();
+
+            // Combine lower and upper hulls
+            return lower.concat(upper);
+        }
 }
 
 export class NacaFoil {
     points: [number, number][] = [];
 
-
-
     // Generate airfoil points
-    _constructor(c: number = 100, naca_code: NacaCode = '0015', resolution: number = 100, fill=true) {
+    _constructor(c: number = 100, naca_code: NacaCode = '0015', resolution: number = 100, convex_hull=true) {
         let naca = parseInt(naca_code);
         let t = (naca % 100) / 100;
         let m = Math.floor((naca - (naca % 100)) / 1000) / 100;
         let p = (((naca - (naca % 100)) / 100) % 10) / 10;
         let res = c / resolution;
         
-        let shift = 10;
+        let shift = 0;
 
         // Upper surface
         for (let i = 0; i <= c; i += res) {
@@ -61,9 +106,6 @@ export class NacaFoil {
 
         // Ensure leading edge connection
         for(let i=0; i<c; i+=res) {
-            if(!fill && i > 0) {
-                break;
-            }
             let leadingEdgeXUpper = NacaFoilMath.camberX(shift + i, c, t, m, p);
             let leadingEdgeYUpper = NacaFoilMath.camberY(0 + i, c, t, m, p);
             let leadingEdgeXLower = NacaFoilMath.camberX(shift + i, c, t, m, p, false);
@@ -72,6 +114,10 @@ export class NacaFoil {
             // Add both upper and lower leading edge points
             this.points.push([leadingEdgeXUpper, leadingEdgeYUpper]);
             this.points.push([leadingEdgeXLower, leadingEdgeYLower]);
+        }
+
+        if(convex_hull) {
+            this.points = NacaFoilMath.convexHull(this.points);
         }
     }
 

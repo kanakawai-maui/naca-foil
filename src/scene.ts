@@ -4,21 +4,21 @@ import { NacaCode } from './types';
 
 // Create Three.js scene
 export class NacaFoilScene {
-    render(naca_code: NacaCode, camber: number = 100) {
+    render(naca_code: NacaCode, camber: number = 100, rotation_speed: number) {
         const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1024);
+        const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1024);
         const renderer = new THREE.WebGLRenderer();
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
         const foil = new Vector2NacaFoil(camber, naca_code);
         const shape = new THREE.Shape(foil.getVectors());
-        const geometry = new THREE.ExtrudeGeometry(shape, { depth: 10, bevelEnabled: false });
+        const geometry = new THREE.ExtrudeGeometry(shape, { depth: 10, bevelEnabled: true });
         const material = new THREE.MeshStandardMaterial({ 
-            color: 0xF0F0FF, 
-            wireframe: true, 
-            roughness: 0.7, 
-            metalness: 0.1
+            color: 0x40F8FF, 
+            wireframe: false, 
+            roughness: 0.1, 
+            metalness: 0.8
         });
         const mesh = new THREE.Mesh(geometry, material);
 
@@ -49,7 +49,7 @@ export class NacaFoilScene {
         }
         positionAttribute.needsUpdate = true;
 
-        plane.position.y = 0;
+        plane.position.y = -100;
         plane.rotation.set((Math.PI * 2) / 3,0,0);
 
         scene.add(plane);
@@ -97,7 +97,7 @@ export class NacaFoilScene {
 
         function animate() {
             requestAnimationFrame(animate);
-            mesh.rotation.y += 0.001;
+            if(rotation_speed) mesh.rotation.y += rotation_speed * 0.001;
             renderer.render(scene, camera);
         }
         animate();
