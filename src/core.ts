@@ -60,6 +60,19 @@ export class NacaFoilMath {
                 upper.push(points[i]);
             }
 
+            // Fill interior with points
+            let interior: [number, number][] = [];
+            for (let i = 0; i < points.length - 1; i++) {
+                let [x1, y1] = points[i];
+                let [x2, y2] = points[i + 1];
+                let step = 0.01; // Adjust step size for density of interior points
+                for (let t = step; t < 1; t += step) {
+                    let x = x1 + t * (x2 - x1);
+                    let y = y1 + t * (y2 - y1);
+                    interior.push([x, y]);
+                }
+            }
+
             // Ensure leading edge connection
             for (let i = 0; i < points.length; i++) {
                 let leadingEdgeXUpper = points[i][0];
@@ -77,7 +90,7 @@ export class NacaFoilMath {
             lower.pop();
 
             // Combine lower and upper hulls
-            return lower.concat(upper);
+            return lower.concat(upper).concat(interior);
         }
 }
 
@@ -104,8 +117,9 @@ export class NacaFoil {
             this.points.push([NacaFoilMath.camberX(i+shift, c, t, m, p, false), NacaFoilMath.camberY(i, c, t, m, p, false)]);
         }
 
+        
         // Ensure leading edge connection
-        for(let i=0; i<c; i+=res) {
+        for(let i=-10; i<c; i+=res) {
             let leadingEdgeXUpper = NacaFoilMath.camberX(shift + i, c, t, m, p);
             let leadingEdgeYUpper = NacaFoilMath.camberY(0 + i, c, t, m, p);
             let leadingEdgeXLower = NacaFoilMath.camberX(shift + i, c, t, m, p, false);
@@ -115,6 +129,7 @@ export class NacaFoil {
             this.points.push([leadingEdgeXUpper, leadingEdgeYUpper]);
             this.points.push([leadingEdgeXLower, leadingEdgeYLower]);
         }
+        
 
         if(convex_hull) {
             this.points = NacaFoilMath.convexHull(this.points);
