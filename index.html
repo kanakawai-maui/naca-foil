@@ -6,17 +6,17 @@
         <style>
             body { margin: 0; }
           </style>
+          <script></script>
     </head>
 <body>
 
 <h1>My First Airfoil</h1>
 
+    <script type="module">
+      import { NacaFoilScene } from './src/index.ts';
+      const airfoil = new NacaFoilScene();
+      airfoil.render("0015", 100);
+    </script>
 
-
-<p id="demo"></p>
-<script src="/scene.js" type="module"></script>
-<script>
-    NacaFoilScene().render("9115");
-</script>
 </body>
 </html> 

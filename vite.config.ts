@@ -10,26 +10,22 @@ export default defineConfig({
       target: 'esnext',
       minify: 'terser',
       lib: {
-        entry: resolve(__dirname, 'src/scene.ts'),
+        entry: resolve(__dirname, 'src/index.ts'),
         name: 'NacaFoilScene',
         formats: ['es', 'umd', 'iife', 'cjs'],
         fileName: format => `naca-foil.${format}.js`,
       },
       rollupOptions: {
         output: {
-          banner: `
-/*!
+          banner: `/*!
 * naca-foil v${pkg.version}
 * https://github.com/kanakawai-maui/naca-foil
-*/
-          `,
-          footer: `
-            if (globalThis.NacaFoilScene) {
-              for (const key of Object.keys(globalThis.NacaFoilScene)) {
-                globalThis[key] = globalThis.NacaFoilScene[key]
-              }
-            }
-          `,
+*/`,
+          footer: `if (globalThis.NacaFoilScene) {
+  for (const key of Object.keys(globalThis.NacaFoilScene)) {
+    globalThis[key] = globalThis.NacaFoilScene[key];
+  }
+}`,
         },
       },
     },

@@ -1,0 +1,1 @@
+export type NacaCode = string;
