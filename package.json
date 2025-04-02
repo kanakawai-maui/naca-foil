@@ -1,0 +1,26 @@
+{
+  "name": "naca-foil",
+  "version": "1.0.0",
+  "description": "a library for generating naca foils",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kanakawai-maui/naca-foil.git"
+  },
+  "keywords": [
+    "naca",
+    "nasa",
+    "airfoil",
+    "foil",
+    "aerodynamics"
+  ],
+  "author": "brownrw8",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/kanakawai-maui/naca-foil/issues"
+  },
+  "homepage": "https://github.com/kanakawai-maui/naca-foil#readme"
+}
