@@ -4,7 +4,11 @@
   "description": "a library for generating naca foils",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext .ts --fix --ignore-path .gitignore",
+    "format": "prettier . --write src/"
   },
   "repository": {
     "type": "git",
@@ -22,5 +26,11 @@
   "bugs": {
     "url": "https://github.com/kanakawai-maui/naca-foil/issues"
   },
-  "homepage": "https://github.com/kanakawai-maui/naca-foil#readme"
+  "homepage": "https://github.com/kanakawai-maui/naca-foil#readme",
+  "dependencies": {
+    "terser": "^5.39.0",
+    "three": "^0.175.0",
+    "vite": "^6.2.4",
+    "vite-plugin-dts": "^4.5.3"
+  }
 }
