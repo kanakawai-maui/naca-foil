@@ -1,6 +1,6 @@
 {
   "name": "naca-foil",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "a library for generating naca foils",
   "scripts": {
     "dev": "vite",
