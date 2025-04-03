@@ -51,16 +51,34 @@
         <div>
           <input
             type="number"
+            max="200"
+            min="10"
+            id="camberInput"
+            class="form-control"
+            placeholder="Camber (length of wing)"
+          />
+        </div>
+        <div>
+          <input
+            type="number"
             max="100"
-            min="1"
-            id="extrudeDepthInput"
+            min="10"
+            id="depthInput"
             class="form-control"
             placeholder="Extrusion depth (width of wing)"
           />
         </div>
-        <button id="refreshButton" class="btn btn-primary">Refresh</button>
+        <div>
+          <button
+            id="refreshButton"
+            class="btn btn-primary"
+            style="margin-top: 10px"
+          >
+            Refresh
+          </button>
+        </div>
+        <div id="naca-foil"></div>
       </div>
-      <div id="naca-foil"></div>
     </div>
 
     <script type="module">
@@ -68,11 +86,33 @@
 
       const airfoil = new NacaFoilScene("naca-foil");
       const codeInput = document.getElementById("codeInput");
+      const camberInput = document.getElementById("camberInput");
+      const depthInput = document.getElementById("depthInput");
       const button = document.getElementById("refreshButton");
 
       button.addEventListener("click", () => {
         const airfoilCode = codeInput.value || "0015";
-        airfoil.update(airfoilCode, 100, 10);
+        if (!/^\d{4}$/.test(airfoilCode)) {
+          alert("Please enter a valid NACA code (4 digits).");
+          return;
+        }
+        const camber = parseInt(camberInput.value) || 100;
+        if (isNaN(camber) || camber < 10 || camber > 200) {
+          alert("Please enter a valid camber length between 10 and 200.");
+          return;
+        }
+        const depth = parseInt(depthInput.value) || 10;
+        if (isNaN(depth) || depth < 10 || depth > 100) {
+          alert("Please enter a valid extrusion depth between 10 and 100.");
+          return;
+        }
+        airfoil.update(airfoilCode, camber, depth);
+      });
+
+      window.addEventListener("keypress", (event) => {
+        if (event.key === "Enter") {
+          button.click();
+        }
       });
 
       airfoil.update("0015", 100, 10);

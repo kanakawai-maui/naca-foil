@@ -53,16 +53,34 @@
         <div>
           <input
             type="number"
+            max="200"
+            min="10"
+            id="camberInput"
+            class="form-control"
+            placeholder="Camber (length of wing)"
+          />
+        </div>
+        <div>
+          <input
+            type="number"
             max="100"
-            min="1"
-            id="extrudeDepthInput"
+            min="10"
+            id="depthInput"
             class="form-control"
             placeholder="Extrusion depth (width of wing)"
           />
         </div>
-        <button id="refreshButton" class="btn btn-primary">Refresh</button>
+        <div>
+          <button
+            id="refreshButton"
+            class="btn btn-primary"
+            style="margin-top: 10px"
+          >
+            Refresh
+          </button>
+        </div>
+        <div id="naca-foil"></div>
       </div>
-      <div id="naca-foil"></div>
     </div>
 
   </body>

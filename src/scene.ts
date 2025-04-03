@@ -59,7 +59,7 @@ export class NacaFoilScene {
       color: 0xffffff,
       wireframe: false,
       side: THREE.DoubleSide,
-      roughness: 0.01,
+      roughness: 0.1,
       metalness: 0.9,
     });
     const mesh = new THREE.Mesh(geometry, material);
@@ -166,11 +166,6 @@ export class NacaFoilScene {
 
       const delta = this.clock.getDelta();
 
-      // Use deterministic values for performance
-      const sinDelta = Math.sin(Date.now() / 3000) / 100;
-      const randomFactor = Math.random() * 0.1;
-      const dir = Math.sin(Date.now() / 3000) >= 0 ? 1 : -1;
-
       const time = Date.now() * 0.0005;
       const meshDip = Math.sin(time) * 0.02;
 
@@ -224,7 +219,7 @@ export class NacaFoilScene {
         points2D = foil.getLeadingEdge();
         glowShape = new THREE.Shape(foil.getLeadingEdgeVectors(1.5));
         closed = true;
-        opacity = 0.02;
+        opacity = 0.05;
         break;
       default:
         console.warn("Invalid option for 'upper'");
