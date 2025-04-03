@@ -12,7 +12,7 @@ export default defineConfig({
       lib: {
         entry: resolve(__dirname, 'src/index.ts'),
         name: 'NacaFoil',
-        formats: ['es', 'umd', 'iife', 'cjs'],
+        formats: ['umd', 'iife', 'cjs'],
         fileName: format => `naca-foil.${format}.js`,
       },
       rollupOptions: {
