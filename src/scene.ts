@@ -1,7 +1,7 @@
 import { Vector2NacaFoil } from './vector';
 import * as THREE from 'three';
 import { NacaCode } from './types';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 
 // Create Three.js scene
 export class NacaFoilScene {
