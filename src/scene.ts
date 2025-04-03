@@ -1,7 +1,7 @@
 import { Vector2NacaFoil } from './vector';
 import * as THREE from 'three';
 import { NacaCode } from './types';
-import { FlyControls } from 'three/examples/jsm/controls/FlyControls'
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 // Create Three.js scene
 export class NacaFoilScene {
@@ -9,7 +9,7 @@ export class NacaFoilScene {
     scene: THREE.Scene;
     renderer: THREE.WebGLRenderer;
     clock: THREE.Clock = new THREE.Clock();
-    controls: FlyControls;
+    controls: OrbitControls;
 
     constructor(id: string='naca-foil') {
         this.scene = new THREE.Scene();
@@ -25,11 +25,7 @@ export class NacaFoilScene {
         this.scene.background = new THREE.Color("darkblue");
         this.scene.fog = new THREE.FogExp2(0xe4dcff, 0.0025);
         // 2. Initiate FlyControls with various params
-        this.controls = new FlyControls( this.camera, this.renderer.domElement );
-        this.controls.movementSpeed = 100;
-        this.controls.rollSpeed = Math.PI / 24;
-        this.controls.autoForward = false;
-        this.controls.dragToLook = true;
+        this.controls = new OrbitControls( this.camera, this.renderer.domElement );
     }
 
     _clear() {
@@ -49,8 +45,8 @@ export class NacaFoilScene {
             256 - 1,
             256 - 1
           );
-          pg.rotateX(-Math.PI / 2);
 
+        /*
         const fogMesh = new THREE.Mesh(
             pg,
             new THREE.MeshBasicMaterial({ color: new THREE.Color(0xefd1b5) })
@@ -86,6 +82,7 @@ export class NacaFoilScene {
         };
 
         scene.add(fogMesh);
+        */
 
         const foil = new Vector2NacaFoil(camber, naca_code);
         const shape = new THREE.Shape(foil.getVectors());
@@ -97,21 +94,25 @@ export class NacaFoilScene {
             color: 0xFFFFFF, 
             wireframe: false, 
             side: THREE.DoubleSide,
-            roughness: 0.1,
-            metalness: 1
+            roughness: 0.01,
+            metalness: 0.9
         });
         const mesh = new THREE.Mesh(geometry, material);
 
         mesh.rotation.x = THREE.MathUtils.degToRad(90);
         mesh.rotation.z = THREE.MathUtils.degToRad(-30);
 
-
         scene.add(mesh);
+        const g1 = this.addGlow(foil, true);
+        const g2 = this.addGlow(foil, false);
+        scene.add(g1);
+        scene.add(g2);
+
 
         // Plane geometry
 
         const width = 1024;
-        const height = 70; // Example height value
+        const height = 60; // Example height value
 
         const numSegments = width - 1; // We have one less vertex than pixel
 
@@ -135,7 +136,7 @@ export class NacaFoilScene {
 
         const positionAttribute = plane.geometry.attributes.position;
         for (let i = 0; i < positionAttribute.count; i++) {
-            const z = height * (Math.sin(i * 0.1) + Math.cos(i * 0.05) + cnoise(new THREE.Vector3(i * 0.1, 0, Date.now() * 0.0001)));
+            const z = height * (Math.sin(i * 0.1) + Math.cos(i * 0.05) + this.cnoise(new THREE.Vector3(i * 0.1, 0, Date.now() * 0.0001)));
             positionAttribute.setZ(i, z);
         }
         positionAttribute.needsUpdate = true;
@@ -168,7 +169,6 @@ export class NacaFoilScene {
         spotLight.castShadow = true;
         scene.add(spotLight);
 
-
         const al1 = new THREE.AmbientLight(0xFFFFFF, 0.4); // Soft ambient light
         scene.add(al1);
 
@@ -186,8 +186,6 @@ export class NacaFoilScene {
         pl2.position.set(250, 350, 300);
         scene.add(pl2);
 
-
-
         const animate = () => {
             requestAnimationFrame(animate);
 
@@ -198,7 +196,8 @@ export class NacaFoilScene {
             const randomFactor = Math.random() * 0.1;
             const dir = Math.sin(Date.now() / 3000) >= 0 ? 1 : -1;
 
-            mesh.rotation.y += sinDelta * randomFactor * dir/ 100;
+            mesh.position.y += sinDelta * randomFactor * dir / 10;
+            mesh.rotation.y += sinDelta * randomFactor * dir / 50;
             mesh.rotation.x += sinDelta * randomFactor * dir / 100;
 
             plane.position.x += 0.015;
@@ -208,11 +207,59 @@ export class NacaFoilScene {
         };
         animate();
     }
+
+    addGlow( foil: Vector2NacaFoil, upper: boolean = true) {
+        // Create a glow effect around the mesh using Points and a PointsMaterial
+        let glowShape = new THREE.Shape();
+        let color = 0x000000;
+        if(upper) {
+            glowShape = new THREE.Shape(foil.getUpperVectors(1.5));
+            color = 0xff0000;
+        } else {
+            glowShape = new THREE.Shape(foil.getLowerVectors(1.5));
+            color = 0x0000ff;
+        }
+        
+        const glowGeometry = new THREE.ExtrudeGeometry(glowShape, { depth: 5, bevelEnabled: false });
+        const glowMaterial = new THREE.PointsMaterial({
+            color: new THREE.Color(color), // Bright glow color in hexadecimal
+            transparent: true,
+            opacity: 0.4,
+            blending: THREE.AdditiveBlending, // Additive blending for glow effect
+            depthWrite: false
+        });
+        const colors = new Float32Array(glowGeometry.attributes.position.count * 3);
+        for (let i = 0; i < colors.length; i += 3) {
+            if(upper) {
+                colors[i] = 1.0; // Red
+                colors[i + 1] = 0.0; // Green
+                colors[i + 2] = 0.3; // Blue
+            } else {    
+                colors[i] = 0.3; // Red
+                colors[i + 1] = 0.0; // Green
+                colors[i + 2] = 1.0; // Blue
+            }
+        }
+        glowGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        glowMaterial.vertexColors = true;
+        glowMaterial.needsUpdate = true;
+    
+        const glow = new THREE.Points(glowGeometry, glowMaterial);
+
+        glow.rotation.x = THREE.MathUtils.degToRad(0);
+        glow.rotation.y = THREE.MathUtils.degToRad(30);
+
+        return glow;
+
+
+    }
+    
+    cnoise = (vector: THREE.Vector3) => {
+        return Math.random() * Math.sin(Date.now() * 0.001) * vector.x * vector.y;
+    }
 }
 
-const cnoise = (vector: THREE.Vector3) => {
-    return Math.random() * Math.sin(Date.now() * 0.001) * vector.x * vector.y;
-}
+
 
 const noise = `
 //	Classic Perlin 3D Noise 

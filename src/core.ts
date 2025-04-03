@@ -96,6 +96,9 @@ export class NacaFoilMath {
 
 export class NacaFoil {
     points: [number, number][] = [];
+    upper: [number, number][] = [];
+    lower: [number, number][] = [];
+    leadingEdge: [number, number][] = [];
 
     // Generate airfoil points
     _constructor(c: number = 100, naca_code: NacaCode = '0015', resolution: number = 100, convex_hull=true) {
@@ -109,14 +112,13 @@ export class NacaFoil {
 
         // Upper surface
         for (let i = 0; i <= c; i += res) {
-            this.points.push([NacaFoilMath.camberX(i+shift, c, t, m, p), NacaFoilMath.camberY(i, c, t, m, p)]);
+            this.upper.push([NacaFoilMath.camberX(i+shift, c, t, m, p), NacaFoilMath.camberY(i, c, t, m, p)]);
         }
         
         // Lower surface
         for (let i = c; i >= 0; i -= res) {
-            this.points.push([NacaFoilMath.camberX(i+shift, c, t, m, p, false), NacaFoilMath.camberY(i, c, t, m, p, false)]);
+            this.lower.push([NacaFoilMath.camberX(i+shift, c, t, m, p, false), NacaFoilMath.camberY(i, c, t, m, p, false)]);
         }
-
         
         // Ensure leading edge connection
         for(let i=-10; i<c; i+=res) {
@@ -126,14 +128,27 @@ export class NacaFoil {
             let leadingEdgeYLower = NacaFoilMath.camberY(0 + i, c, t, m, p, false);
 
             // Add both upper and lower leading edge points
-            this.points.push([leadingEdgeXUpper, leadingEdgeYUpper]);
-            this.points.push([leadingEdgeXLower, leadingEdgeYLower]);
+            this.leadingEdge.push([leadingEdgeXUpper, leadingEdgeYUpper]);
+            this.leadingEdge.push([leadingEdgeXLower, leadingEdgeYLower]);
         }
-        
+
+        this.points = this.upper.concat(this.lower).concat(this.leadingEdge);
 
         if(convex_hull) {
             this.points = NacaFoilMath.convexHull(this.points);
         }
+    }
+
+    getUpper(scale: number = 1) {
+        return this.upper.map((point) => [point[0] * scale, point[1] * scale]);
+    }
+
+    getLower(scale: number = 1) {
+        return this.lower.map((point) => [point[0] * scale, point[1] * scale]);
+    }
+
+    getLeadingEdge(scale: number = 1) {
+        return this.leadingEdge.map((point) => [point[0] * scale, point[1] * scale]);
     }
 
     getPoints() {

@@ -13,4 +13,16 @@ export class Vector2NacaFoil extends NacaFoil {
     getVectors(): Array<Vector2> {
         return this.vectors;
     }
+
+    getUpperVectors(scale: number = 1): Array<Vector2> {
+        return this.getUpper(scale).map((point) => new Vector2(point[0], point[1]));
+    }
+
+    getLowerVectors(scale: number = 1): Array<Vector2> {
+        return this.getLower(scale).map((point) => new Vector2(point[0], point[1]));
+    }
+
+    getLeadingEdgeVectors(scale: number = 1): Array<Vector2> {
+        return this.getLeadingEdge(scale).map((point) => new Vector2(point[0], point[1]));
+    }
 }
