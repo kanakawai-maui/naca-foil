@@ -171,18 +171,26 @@ export class NacaFoilScene {
       const randomFactor = Math.random() * 0.1;
       const dir = Math.sin(Date.now() / 3000) >= 0 ? 1 : -1;
 
-      const time = Date.now() * 0.005;
-      const meshDip = Math.sin(time) * 0.2;
+      const time = Date.now() * 0.0005;
+      const meshDip = Math.sin(time) * 0.02;
 
-      mesh.position.y += meshDip;
+      const liftFactor = 0.05; // Simulate lift effect
+      const dragFactor = 0.01; // Simulate drag effect
 
-      const delayFactor = 0.01; // Adjust delay factor for fluidity
-      g1.position.y += Math.sin(time - delayFactor) * 0.2;
-      g2.position.y += Math.sin(time - delayFactor * 2) * 0.2;
-      g3.position.y += Math.sin(time - delayFactor * 3) * 0.2;
+      // Apply lift to the glow and mesh
+      g1.position.y += liftFactor * Math.sin(time);
+      g2.position.y += liftFactor * Math.sin(time);
+      g3.position.y += liftFactor * Math.sin(time);
+      mesh.position.y += liftFactor * Math.sin(time);
 
-      // Add slight rotation with sin and delay factor
-      mesh.rotation.y += meshDip * 0.001;
+      // Simulate drag by slightly reducing forward motion
+      plane.position.x += 0.015 - dragFactor;
+
+      // Add slight rotation to simulate aerodynamic forces
+      mesh.rotation.y += meshDip * 0.005; // Reduced rotation for realism
+      g1.rotation.x += meshDip * 0.01;
+      g2.rotation.x += meshDip * 0.01;
+      g3.rotation.x += meshDip * 0.005;
 
       // Update plane position to make us look like we're in motion
       plane.position.x += 0.015;
