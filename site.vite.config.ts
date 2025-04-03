@@ -15,23 +15,21 @@ export default defineConfig({
   build: {
     target: "esnext",
     minify: "terser",
-    lib: {
-      entry: resolve(__dirname, "src/index.ts"),
-      name: "NacaFoil",
-      formats: ["es", "umd", "iife", "cjs"],
-      fileName: (format) => `naca-foil.${format}.js`,
-    },
+    outDir: "site",
+    assetsDir: "assets",
     rollupOptions: {
+      input: {
+        main: resolve(__dirname, "src/index.ts"),
+        demo: resolve(__dirname, "index.html"),
+      },
       output: {
+        entryFileNames: "[name].js",
+        assetFileNames: "assets/[name].[ext]",
+        manualChunks: undefined,
         banner: `/*!
-* naca-foil v${pkg.version}
-* https://github.com/kanakawai-maui/naca-foil
-*/`,
-        footer: `if (globalThis.NacaFoil) {
-  for (const key of Object.keys(globalThis.NacaFoil)) {
-    globalThis[key] = globalThis.NacaFoil[key];
-  }
-}`,
+      * naca-foil v${pkg.version}
+      * https://github.com/kanakawai-maui/naca-foil
+      */`,
       },
     },
   },

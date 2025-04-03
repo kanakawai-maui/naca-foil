@@ -1,8 +1,10 @@
 {
-    "compilerOptions": {
-        "paths": {
-            "three/addons/controls/*": ["node_modules/@types/three/examples/jsm/controls/*"],
-        },
-        "baseUrl": "./"
-    }
+  "compilerOptions": {
+    "paths": {
+      "three/addons/controls/*": [
+        "node_modules/@types/three/examples/jsm/controls/*"
+      ]
+    },
+    "baseUrl": "./"
+  }
 }

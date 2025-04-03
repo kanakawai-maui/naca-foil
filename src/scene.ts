@@ -1,52 +1,56 @@
-import { Vector2NacaFoil } from './vector';
-import * as THREE from 'three';
-import { NacaCode } from './types';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { Vector2NacaFoil } from "./vector";
+import * as THREE from "three";
+import { NacaCode } from "./types";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 
 // Create Three.js scene
 export class NacaFoilScene {
-    camera: THREE.PerspectiveCamera;
-    scene: THREE.Scene;
-    renderer: THREE.WebGLRenderer;
-    clock: THREE.Clock = new THREE.Clock();
-    controls: OrbitControls;
+  camera: THREE.PerspectiveCamera;
+  scene: THREE.Scene;
+  renderer: THREE.WebGLRenderer;
+  clock: THREE.Clock = new THREE.Clock();
+  controls: OrbitControls;
 
-    constructor(id: string='naca-foil') {
-        this.scene = new THREE.Scene();
-        this.camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1024);
-        this.renderer = new THREE.WebGLRenderer();
-        this.renderer.setSize(window.innerWidth, window.innerHeight);
-        const container = document.getElementById(id);
-        if (container) {
-            container.appendChild(this.renderer.domElement);
-        } else {
-            console.error(`Container with id "${id}" not found.`);
-        }
-        this.scene.background = new THREE.Color("darkblue");
-        this.scene.fog = new THREE.FogExp2(0xe4dcff, 0.0025);
-        // 2. Initiate FlyControls with various params
-        this.controls = new OrbitControls( this.camera, this.renderer.domElement );
+  constructor(id: string = "naca-foil") {
+    this.scene = new THREE.Scene();
+    this.camera = new THREE.PerspectiveCamera(
+      50,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      1024,
+    );
+    this.renderer = new THREE.WebGLRenderer();
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    const container = document.getElementById(id);
+    if (container) {
+      container.appendChild(this.renderer.domElement);
+    } else {
+      console.error(`Container with id "${id}" not found.`);
     }
+    this.scene.background = new THREE.Color("darkblue");
+    this.scene.fog = new THREE.FogExp2(0xe4dcff, 0.0025);
+    // 2. Initiate FlyControls with various params
+    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+  }
 
-    _clear() {
-        while(this.scene.children.length > 0){ 
-            this.scene.remove(this.scene.children[0]); 
-        }
+  _clear() {
+    while (this.scene.children.length > 0) {
+      this.scene.remove(this.scene.children[0]);
     }
-    
-    update(naca_code: NacaCode, camber: number = 100, extrude_depth: number=10) {
-        this._clear();
-        this.camera.position.z = 200;
-        const { camera, scene, renderer } = this;
+  }
 
-        var pg = new THREE.PlaneGeometry(
-            7500,
-            7500,
-            256 - 1,
-            256 - 1
-          );
+  update(
+    naca_code: NacaCode,
+    camber: number = 100,
+    extrude_depth: number = 10,
+  ) {
+    this._clear();
+    this.camera.position.z = 200;
+    const { camera, scene, renderer } = this;
 
-        /*
+    var pg = new THREE.PlaneGeometry(7500, 7500, 256 - 1, 256 - 1);
+
+    /*
         const fogMesh = new THREE.Mesh(
             pg,
             new THREE.MeshBasicMaterial({ color: new THREE.Color(0xefd1b5) })
@@ -84,182 +88,184 @@ export class NacaFoilScene {
         scene.add(fogMesh);
         */
 
-        const foil = new Vector2NacaFoil(camber, naca_code);
-        const shape = new THREE.Shape(foil.getVectors());
-        const geometry = new THREE.ExtrudeGeometry(shape, { 
-            depth: extrude_depth, 
-            bevelEnabled: true
-        });
-        const material = new THREE.MeshStandardMaterial({ 
-            color: 0xFFFFFF, 
-            wireframe: false, 
-            side: THREE.DoubleSide,
-            roughness: 0.01,
-            metalness: 0.9
-        });
-        const mesh = new THREE.Mesh(geometry, material);
+    const foil = new Vector2NacaFoil(camber, naca_code);
+    const shape = new THREE.Shape(foil.getVectors());
+    const geometry = new THREE.ExtrudeGeometry(shape, {
+      depth: extrude_depth,
+      bevelEnabled: true,
+    });
+    const material = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      wireframe: false,
+      side: THREE.DoubleSide,
+      roughness: 0.01,
+      metalness: 0.9,
+    });
+    const mesh = new THREE.Mesh(geometry, material);
 
-        mesh.rotation.x = THREE.MathUtils.degToRad(90);
-        mesh.rotation.z = THREE.MathUtils.degToRad(-30);
+    mesh.rotation.x = THREE.MathUtils.degToRad(90);
+    mesh.rotation.z = THREE.MathUtils.degToRad(-30);
 
-        scene.add(mesh);
-        const g1 = this.addGlow(foil, true);
-        const g2 = this.addGlow(foil, false);
-        scene.add(g1);
-        scene.add(g2);
+    scene.add(mesh);
+    const g1 = this.addGlow(foil, true);
+    const g2 = this.addGlow(foil, false);
+    scene.add(g1);
+    scene.add(g2);
 
+    // Plane geometry
 
-        // Plane geometry
+    const width = 1024;
+    const height = 60; // Example height value
 
-        const width = 1024;
-        const height = 60; // Example height value
+    const numSegments = width - 1; // We have one less vertex than pixel
 
-        const numSegments = width - 1; // We have one less vertex than pixel
+    var planeGeo = new THREE.PlaneGeometry(
+      7500,
+      7500,
+      numSegments,
+      numSegments,
+    );
 
-        var planeGeo = new THREE.PlaneGeometry(
-            7500,
-            7500,
-            numSegments,
-            numSegments
-        );
+    geometry.rotateX(-Math.PI / 2);
 
-        geometry.rotateX(-Math.PI / 2);
+    const planeMat = new THREE.MeshStandardMaterial({
+      color: 0xccccff,
+      wireframe: false,
+      roughness: 0.9,
+    });
 
-        const planeMat = new THREE.MeshStandardMaterial({
-            color: 0xccccff,
-            wireframe: false,
-            roughness: 0.9
-        });
+    const plane = new THREE.Mesh(planeGeo, planeMat);
+    plane.name = "terrain";
 
-        const plane = new THREE.Mesh(planeGeo, planeMat);
-        plane.name = 'terrain';
+    const positionAttribute = plane.geometry.attributes.position;
+    for (let i = 0; i < positionAttribute.count; i++) {
+      const z =
+        height *
+        (Math.sin(i * 0.1) +
+          Math.cos(i * 0.05) +
+          this.cnoise(new THREE.Vector3(i * 0.1, 0, Date.now() * 0.0001)));
+      positionAttribute.setZ(i, z);
+    }
+    positionAttribute.needsUpdate = true;
 
-        const positionAttribute = plane.geometry.attributes.position;
-        for (let i = 0; i < positionAttribute.count; i++) {
-            const z = height * (Math.sin(i * 0.1) + Math.cos(i * 0.05) + this.cnoise(new THREE.Vector3(i * 0.1, 0, Date.now() * 0.0001)));
-            positionAttribute.setZ(i, z);
-        }
-        positionAttribute.needsUpdate = true;
+    plane.position.y = -200;
+    plane.position.x = -100;
+    plane.rotation.set((Math.PI * 1.5) / 3, 0, 0);
 
-        plane.position.y = -200;
-        plane.position.x = -100;
-        plane.rotation.set((Math.PI * 1.5) / 3,0,0);
+    scene.add(plane);
+    // End plane geo
 
-        scene.add(plane);
-        // End plane geo
+    const sunlight = new THREE.DirectionalLight(0xfffffb, 0.9);
+    sunlight.position.set(200, 300, 400);
+    sunlight.castShadow = true;
 
-        const sunlight = new THREE.DirectionalLight(0xfffffb, 0.9);
-        sunlight.position.set(200, 300, 400);
-        sunlight.castShadow = true;
+    sunlight.shadow.mapSize.width = 5024;
+    sunlight.shadow.mapSize.height = 1024;
+    sunlight.shadow.camera.near = 10;
+    sunlight.shadow.camera.far = 1000;
+    sunlight.intensity = 1;
+    sunlight.castShadow = true;
+    scene.add(sunlight);
 
-        sunlight.shadow.mapSize.width = 5024;
-        sunlight.shadow.mapSize.height = 1024;
-        sunlight.shadow.camera.near = 10;
-        sunlight.shadow.camera.far = 1000;
-        sunlight.intensity = 1;
-        sunlight.castShadow = true;
-        scene.add(sunlight);
+    const spotLight = new THREE.SpotLight(0xadd8e6, 0.7);
+    spotLight.position.set(100, 200, 500);
+    spotLight.angle = Math.PI / 6;
+    spotLight.penumbra = 0.1;
+    spotLight.decay = 2;
+    spotLight.distance = 500;
+    spotLight.castShadow = true;
+    scene.add(spotLight);
 
-        const spotLight = new THREE.SpotLight(0xADD8E6, 0.7);
-        spotLight.position.set(100, 200, 500);
-        spotLight.angle = Math.PI / 6;
-        spotLight.penumbra = 0.1;
-        spotLight.decay = 2;
-        spotLight.distance = 500;
-        spotLight.castShadow = true;
-        scene.add(spotLight);
+    const al1 = new THREE.AmbientLight(0xffffff, 0.4); // Soft ambient light
+    scene.add(al1);
 
-        const al1 = new THREE.AmbientLight(0xFFFFFF, 0.4); // Soft ambient light
-        scene.add(al1);
+    const al2 = new THREE.AmbientLight(0xffffff, 0.4); // Soft ambient light
+    scene.add(al2);
 
-        const al2 = new THREE.AmbientLight(0xFFFFFF, 0.4); // Soft ambient light
-        scene.add(al2);
+    const hemisphereLight = new THREE.HemisphereLight(0xadd8e6, 0xadd8e6, 0.3);
+    scene.add(hemisphereLight);
 
-        const hemisphereLight = new THREE.HemisphereLight(0xADD8E6, 0xADD8E6, 0.3);
-        scene.add(hemisphereLight);
+    const pl1 = new THREE.PointLight(0xffffff, 0.8, 1000);
+    pl1.position.set(200, 150, 200);
+    scene.add(pl1);
 
-        const pl1 = new THREE.PointLight(0xFFFFFF, 0.8, 1000);
-        pl1.position.set(200, 150, 200);
-        scene.add(pl1);
+    const pl2 = new THREE.PointLight(0xffffff, 0.4, 1000);
+    pl2.position.set(250, 350, 300);
+    scene.add(pl2);
 
-        const pl2 = new THREE.PointLight(0xFFFFFF, 0.4, 1000);
-        pl2.position.set(250, 350, 300);
-        scene.add(pl2);
+    const animate = () => {
+      requestAnimationFrame(animate);
 
-        const animate = () => {
-            requestAnimationFrame(animate);
+      const delta = this.clock.getDelta();
 
-            const delta = this.clock.getDelta();
+      // Use deterministic values for performance
+      const sinDelta = Math.sin(Date.now() / 3000) / 100;
+      const randomFactor = Math.random() * 0.1;
+      const dir = Math.sin(Date.now() / 3000) >= 0 ? 1 : -1;
 
-            // Use deterministic values for performance
-            const sinDelta = Math.sin(Date.now() / 3000) / 100;
-            const randomFactor = Math.random() * 0.1;
-            const dir = Math.sin(Date.now() / 3000) >= 0 ? 1 : -1;
+      mesh.position.y += (sinDelta * randomFactor * dir) / 10;
+      mesh.rotation.y += (sinDelta * randomFactor * dir) / 50;
+      mesh.rotation.x += (sinDelta * randomFactor * dir) / 100;
 
-            mesh.position.y += sinDelta * randomFactor * dir / 10;
-            mesh.rotation.y += sinDelta * randomFactor * dir / 50;
-            mesh.rotation.x += sinDelta * randomFactor * dir / 100;
+      plane.position.x += 0.015;
 
-            plane.position.x += 0.015;
+      this.controls.update(delta);
+      renderer.render(scene, camera);
+    };
+    animate();
+  }
 
-            this.controls.update(delta);
-            renderer.render(scene, camera);
-        };
-        animate();
+  addGlow(foil: Vector2NacaFoil, upper: boolean = true) {
+    // Create a glow effect around the mesh using Points and a PointsMaterial
+    let glowShape = new THREE.Shape();
+    let color = 0x000000;
+    if (upper) {
+      glowShape = new THREE.Shape(foil.getUpperVectors(1.5));
+      color = 0xff0000;
+    } else {
+      glowShape = new THREE.Shape(foil.getLowerVectors(1.5));
+      color = 0x0000ff;
     }
 
-    addGlow( foil: Vector2NacaFoil, upper: boolean = true) {
-        // Create a glow effect around the mesh using Points and a PointsMaterial
-        let glowShape = new THREE.Shape();
-        let color = 0x000000;
-        if(upper) {
-            glowShape = new THREE.Shape(foil.getUpperVectors(1.5));
-            color = 0xff0000;
-        } else {
-            glowShape = new THREE.Shape(foil.getLowerVectors(1.5));
-            color = 0x0000ff;
-        }
-        
-        const glowGeometry = new THREE.ExtrudeGeometry(glowShape, { depth: 5, bevelEnabled: false });
-        const glowMaterial = new THREE.PointsMaterial({
-            color: new THREE.Color(color), // Bright glow color in hexadecimal
-            transparent: true,
-            opacity: 0.4,
-            blending: THREE.AdditiveBlending, // Additive blending for glow effect
-            depthWrite: false
-        });
-        const colors = new Float32Array(glowGeometry.attributes.position.count * 3);
-        for (let i = 0; i < colors.length; i += 3) {
-            if(upper) {
-                colors[i] = 1.0; // Red
-                colors[i + 1] = 0.0; // Green
-                colors[i + 2] = 0.3; // Blue
-            } else {    
-                colors[i] = 0.3; // Red
-                colors[i + 1] = 0.0; // Green
-                colors[i + 2] = 1.0; // Blue
-            }
-        }
-        glowGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-        glowMaterial.vertexColors = true;
-        glowMaterial.needsUpdate = true;
-    
-        const glow = new THREE.Points(glowGeometry, glowMaterial);
-
-        glow.rotation.x = THREE.MathUtils.degToRad(0);
-        glow.rotation.y = THREE.MathUtils.degToRad(30);
-
-        return glow;
-
-
+    const glowGeometry = new THREE.ExtrudeGeometry(glowShape, {
+      depth: 5,
+      bevelEnabled: false,
+    });
+    const glowMaterial = new THREE.PointsMaterial({
+      color: new THREE.Color(color), // Bright glow color in hexadecimal
+      transparent: true,
+      opacity: 0.4,
+      blending: THREE.AdditiveBlending, // Additive blending for glow effect
+      depthWrite: false,
+    });
+    const colors = new Float32Array(glowGeometry.attributes.position.count * 3);
+    for (let i = 0; i < colors.length; i += 3) {
+      if (upper) {
+        colors[i] = 1.0; // Red
+        colors[i + 1] = 0.0; // Green
+        colors[i + 2] = 0.3; // Blue
+      } else {
+        colors[i] = 0.3; // Red
+        colors[i + 1] = 0.0; // Green
+        colors[i + 2] = 1.0; // Blue
+      }
     }
-    
-    cnoise = (vector: THREE.Vector3) => {
-        return Math.random() * Math.sin(Date.now() * 0.001) * vector.x * vector.y;
-    }
+    glowGeometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+    glowMaterial.vertexColors = true;
+    glowMaterial.needsUpdate = true;
+
+    const glow = new THREE.Points(glowGeometry, glowMaterial);
+
+    glow.rotation.x = THREE.MathUtils.degToRad(0);
+    glow.rotation.y = THREE.MathUtils.degToRad(30);
+
+    return glow;
+  }
+
+  cnoise = (vector: THREE.Vector3) => {
+    return Math.random() * Math.sin(Date.now() * 0.001) * vector.x * vector.y;
+  };
 }
-
-
 
 const noise = `
 //	Classic Perlin 3D Noise 
@@ -388,5 +394,4 @@ const fogParsFrag = `
   uniform float fogNoiseFreq;
   uniform float fogNoiseImpact;
 #endif
-`
-
+`;
