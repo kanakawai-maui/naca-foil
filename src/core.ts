@@ -177,7 +177,7 @@ export class NacaFoil {
     }
 
     // Ensure leading edge connection
-    for (let i = -10; i < c; i += res) {
+    for (let i = 0; i < c; i += res) {
       let leadingEdgeXUpper = NacaFoilMath.camberX(shift + i, c, t, m, p);
       let leadingEdgeYUpper = NacaFoilMath.camberY(0 + i, c, t, m, p);
       let leadingEdgeXLower = NacaFoilMath.camberX(
@@ -195,29 +195,69 @@ export class NacaFoil {
       this.leadingEdge.push([leadingEdgeXLower, leadingEdgeYLower]);
     }
 
+    this.upper = this.upper
+      .filter((point) => !isNaN(point[0]) && !isNaN(point[1]))
+      .map((point) => [point[0], point[1]]);
+
+    this.lower = this.lower
+      .filter((point) => !isNaN(point[0]) && !isNaN(point[1]))
+      .map((point) => [point[0], point[1]]);
+
+    this.leadingEdge = this.leadingEdge
+      .filter((point) => !isNaN(point[0]) && !isNaN(point[1]))
+      .map((point) => [point[0], point[1]]);
+
     this.points = this.upper.concat(this.lower).concat(this.leadingEdge);
+
+    this.points = this.points
+      .filter((point) => !isNaN(point[0]) && !isNaN(point[1]))
+      .map((point) => [point[0], point[1]]);
 
     if (convex_hull) {
       this.points = NacaFoilMath.convexHull(this.points);
     }
+
+    this.points = this.points
+      .filter((point) => !isNaN(point[0]) && !isNaN(point[1]))
+      .map((point) => [point[0], point[1]]);
   }
 
-  getUpper(scale: number = 1) {
-    return this.upper.map((point) => [point[0] * scale, point[1] * scale]);
+  getUpper(
+    scale: number = 1,
+    transform: Function = (p: [number, number], scale: number) => [
+      p[0] * scale,
+      p[1] * scale,
+    ],
+  ) {
+    return this.upper.map((point) => transform([point[0], point[1]], scale));
   }
 
-  getLower(scale: number = 1) {
-    return this.lower.map((point) => [point[0] * scale, point[1] * scale]);
+  getLower(
+    scale: number = 1,
+    transform: Function = (p: [number, number], scale: number) => [
+      p[0] * scale,
+      p[1] * -scale,
+    ],
+  ) {
+    return this.upper.map((point) => transform([point[0], point[1]], scale));
   }
 
-  getLeadingEdge(scale: number = 1) {
-    return this.leadingEdge.map((point) => [
-      point[0] * scale,
-      point[1] * scale,
-    ]);
+  getLeadingEdge(
+    scale: number = 1,
+    transform: Function = (p: [number, number], scale: number) => [
+      p[0] * scale,
+      p[1] * -scale,
+    ],
+  ) {
+    return this.leadingEdge.map((point) =>
+      transform([point[0], point[1]], scale),
+    );
   }
 
-  getPoints() {
+  getPoints(sampled: boolean = false): [number, number][] {
+    if (sampled) {
+      return this.points.filter((_, index) => index % 1000 === 0);
+    }
     return this.points;
   }
 }

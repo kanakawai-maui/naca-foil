@@ -14,8 +14,8 @@ export declare class NacaFoil {
     lower: [number, number][];
     leadingEdge: [number, number][];
     _constructor(c?: number, naca_code?: NacaCode, resolution?: number, convex_hull?: boolean): void;
-    getUpper(scale?: number): number[][];
-    getLower(scale?: number): number[][];
-    getLeadingEdge(scale?: number): number[][];
-    getPoints(): [number, number][];
+    getUpper(scale?: number, transform?: Function): any[];
+    getLower(scale?: number, transform?: Function): any[];
+    getLeadingEdge(scale?: number, transform?: Function): any[];
+    getPoints(sampled?: boolean): [number, number][];
 }

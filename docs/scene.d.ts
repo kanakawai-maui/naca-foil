@@ -11,6 +11,7 @@ export declare class NacaFoilScene {
     constructor(id?: string);
     _clear(): void;
     update(naca_code: NacaCode, camber?: number, extrude_depth?: number): void;
-    addGlow(foil: Vector2NacaFoil, upper?: boolean): THREE.Points<THREE.ExtrudeGeometry, THREE.PointsMaterial, THREE.Object3DEventMap>;
+    getGlow(foil: Vector2NacaFoil, position: "upper" | "lower" | "leadingedge", depth?: number): THREE.Points<THREE.ExtrudeGeometry, THREE.PointsMaterial, THREE.Object3DEventMap>;
+    getCurve: (point2D: [number, number][], closed?: boolean) => THREE.CatmullRomCurve3;
     cnoise: (vector: THREE.Vector3) => number;
 }

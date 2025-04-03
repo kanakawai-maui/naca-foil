@@ -24,14 +24,14 @@ export default defineConfig({
     rollupOptions: {
       output: {
         banner: `/*!
-* naca-foil v${pkg.version}
-* https://github.com/kanakawai-maui/naca-foil
-*/`,
+        * naca-foil v${pkg.version}
+        * https://github.com/kanakawai-maui/naca-foil
+        */`,
         footer: `if (globalThis.NacaFoil) {
-  for (const key of Object.keys(globalThis.NacaFoil)) {
-    globalThis[key] = globalThis.NacaFoil[key];
-  }
-}`,
+          for (const key of Object.keys(globalThis.NacaFoil)) {
+            globalThis[key] = globalThis.NacaFoil[key];
+          }
+        }`,
       },
     },
   },
