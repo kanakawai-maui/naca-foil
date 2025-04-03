@@ -1,5 +1,5 @@
 /*!
-      * naca-foil v1.1.0
+      * naca-foil v1.1.1
       * https://github.com/kanakawai-maui/naca-foil
       */
 import{N as e}from"./main.js";!function(){const e=document.createElement("link").relList;if(!(e&&e.supports&&e.supports("modulepreload"))){for(const e of document.querySelectorAll('link[rel="modulepreload"]'))t(e);new MutationObserver((e=>{for(const n of e)if("childList"===n.type)for(const e of n.addedNodes)"LINK"===e.tagName&&"modulepreload"===e.rel&&t(e)})).observe(document,{childList:!0,subtree:!0})}function t(e){if(e.ep)return;e.ep=!0;const t=function(e){const t={};return e.integrity&&(t.integrity=e.integrity),e.referrerPolicy&&(t.referrerPolicy=e.referrerPolicy),"use-credentials"===e.crossOrigin?t.credentials="include":"anonymous"===e.crossOrigin?t.credentials="omit":t.credentials="same-origin",t}(e);fetch(e.href,t)}}();const t=new e("naca-foil"),n=document.getElementById("codeInput"),r=document.getElementById("extrudeDepthInput"),o=document.getElementById("camberInput");document.getElementById("refreshButton").addEventListener("click",(()=>{const e=n.value||"0015",i=o?.value?parseInt(o.value):100,c=r?.value?parseInt(r.value):10;t.update(e,i,c)})),t.update("0015",100,10);

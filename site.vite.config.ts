@@ -15,7 +15,7 @@ export default defineConfig({
   build: {
     target: "esnext",
     minify: "terser",
-    outDir: "site",
+    outDir: "docs",
     assetsDir: "assets",
     rollupOptions: {
       input: {
@@ -25,7 +25,6 @@ export default defineConfig({
       output: {
         entryFileNames: "[name].js",
         assetFileNames: "assets/[name].[ext]",
-        manualChunks: undefined,
         banner: `/*!
       * naca-foil v${pkg.version}
       * https://github.com/kanakawai-maui/naca-foil
