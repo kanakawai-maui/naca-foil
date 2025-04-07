@@ -5,13 +5,12 @@ export class Vector2NacaFoil extends NacaFoil {
   vectors: Array<Vector2> = [];
 
   constructor(
-    c: number = 100,
+    chord: number = 100,
     naca_code: string = "0015",
-    resolution: number = 100,
-    convex_hull = true,
+    resolution: number = 100
   ) {
     super();
-    this._constructor(c, naca_code, resolution, convex_hull);
+    this._constructor(chord, naca_code, resolution);
     this.vectors = this.points.map((point) => new Vector2(point[0], point[1]));
   }
 

@@ -28,20 +28,14 @@ export class NacaFoilScene {
       console.error(`Container with id "${id}" not found.`);
     }
     this.scene.background = new THREE.Color(0x1e90ff); // Ocean blue color
-    this.scene.fog = new THREE.FogExp2("black", 0.00002);
+    this.scene.fog = new THREE.FogExp2("blue", 0.2);
     // 2. Initiate FlyControls with various params
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
 
     // An axis object to visualize the 3 axes in a simple way.
     // sThe X axis is red. The Y axis is green. The Z axis is blue.
     const axesHelper = new THREE.AxesHelper( 5 );
-    this.scene.add( axesHelper );
-
-    const ocean = this.getOceanMesh(1024);
-
-    ocean.scale.set(100, 100, 1); // Scale the ground to make it appear larger
-
-    this.scene.add(ocean);
+    this.scene.add(axesHelper);
   }
 
   update(

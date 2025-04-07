@@ -36,4 +36,8 @@ export default defineConfig({
     },
   },
   plugins: [dts()],
+  test: {
+    globals: true,
+    environment: 'node',
+  },
 });

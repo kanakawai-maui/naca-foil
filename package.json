@@ -48,7 +48,8 @@
     "terser": "^5.39.0",
     "typescript": "^5.4.5",
     "vite": "^6.2.4",
-    "vite-plugin-dts": "^4.5.3"
+    "vite-plugin-dts": "^4.5.3",
+    "vitest": "^3.1.1"
   },
   "type": "module",
   "main": "./dist/naca-foil.cjs.js",
