@@ -3,6 +3,7 @@ import { defineConfig } from "vite";
 import dts from "vite-plugin-dts";
 import { resolve } from "path";
 import pkg from "./package.json";
+import wasm from 'vite-plugin-wasm';
 
 if (process.env.NODE_ENV !== "production") {
   console.warn(
@@ -32,5 +33,5 @@ export default defineConfig({
       },
     },
   },
-  plugins: [dts()],
+  plugins: [dts(), wasm()],
 });

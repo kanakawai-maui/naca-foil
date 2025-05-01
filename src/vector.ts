@@ -5,9 +5,9 @@ export class Vector2NacaFoil extends NacaFoil {
   vectors: Array<Vector2> = [];
 
   constructor(
-    chord: number = 100,
+    chord: number = 10,
     naca_code: string = "0015",
-    resolution: number = 100
+    resolution: number = 1
   ) {
     super();
     this._constructor(chord, naca_code, resolution);
@@ -26,9 +26,8 @@ export class Vector2NacaFoil extends NacaFoil {
     return this.getLower(scale).map((point) => new Vector2(point[0], point[1]));
   }
 
-  getLeadingEdgeVectors(scale: number = 1): Array<Vector2> {
-    return this.getLeadingEdge(scale).map(
-      (point) => new Vector2(point[0], point[1]),
-    );
+  getCoreVectors(scale: number = 1): Array<Vector2> {
+    return this.getCore(scale).map((point) => new Vector2(point[0], point[1]));
   }
+
 }

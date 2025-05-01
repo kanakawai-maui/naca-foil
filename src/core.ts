@@ -1,4 +1,3 @@
-import { NacaCode } from "./types";
 
 export class NacaFoilMath {
 
@@ -82,88 +81,23 @@ export class NacaFoilMath {
             NacaFoilMath.foilY(x, c, t) *
                 Math.sin(NacaFoilMath.theta(x, c, m, p));
     }
-
-    static convexHull(points: [number, number][]) {
-        // Sort points by x-coordinate
-        points.sort((a, b) => a[0] - b[0]);
-
-        // Create lower hull
-        let lower: [number, number][] = [];
-        for (let i = 0; i < points.length; i++) {
-        while (
-            lower.length >= 2 &&
-            NacaFoilMath.cross(
-            lower[lower.length - 2],
-            lower[lower.length - 1],
-            points[i],
-            ) <= 0
-        ) {
-            lower.pop();
-        }
-        lower.push(points[i]);
-        }
-
-        // Create upper hull
-        let upper: [number, number][] = [];
-        for (let i = points.length - 1; i >= 0; i--) {
-        while (
-            upper.length >= 2 &&
-            NacaFoilMath.cross(
-            upper[upper.length - 2],
-            upper[upper.length - 1],
-            points[i],
-            ) <= 0
-        ) {
-            upper.pop();
-        }
-        upper.push(points[i]);
-        }
-
-        // Fill interior with points
-        let interior: [number, number][] = [];
-        for (let i = 0; i < points.length - 1; i++) {
-        let [x1, y1] = points[i];
-        let [x2, y2] = points[i + 1];
-        let step = 0.01; // Adjust step size for density of interior points
-        for (let t = step; t < 1; t += step) {
-            let x = x1 + t * (x2 - x1);
-            let y = y1 + t * (y2 - y1);
-            interior.push([x, y]);
-        }
-        }
-
-        // Ensure leading edge connection
-        for (let i = 0; i < points.length; i++) {
-        let leadingEdgeXUpper = points[i][0];
-        let leadingEdgeYUpper = points[i][1];
-        let leadingEdgeXLower = points[i][0];
-        let leadingEdgeYLower = points[i][1];
-
-        // Add both upper and lower leading edge points
-        lower.push([leadingEdgeXUpper, leadingEdgeYUpper]);
-        upper.push([leadingEdgeXLower, leadingEdgeYLower]);
-        }
-
-        // Remove the last point of each half because it's repeated at the beginning of the other half
-        upper.pop();
-        lower.pop();
-
-        // Combine lower and upper hulls
-        return lower.concat(upper).concat(interior);
-    }
 }
 
 export class NacaFoil {
   points: [number, number][] = [];
   upper: [number, number][] = [];
   lower: [number, number][] = [];
-  leadingEdge: [number, number][] = [];
+  core: [number, number][] = [];
+
+  chord: number = 10;
+  xyRatio: number = 1;
+  yCamber: number = 0;
 
   // Generate airfoil points
   _constructor(
     chord: number = 10,
-    naca_code: NacaCode = "0015",
-    resolution: number = 0.1
+    naca_code: string = "0015",
+    resolution: number = 10
   ) {
     let naca = parseInt(naca_code);
     let c = chord;
@@ -173,67 +107,47 @@ export class NacaFoil {
     let res = resolution;
 
     let shift = 0;
-
     // Upper surface
     for (let i = 0; i <= c; i += res) {
       this.upper.push([
-        NacaFoilMath.camberX(i + shift, c, t, m, p),
-        NacaFoilMath.camberY(i, c, t, m, p),
+      NacaFoilMath.camberX(i + shift, c, t, m, p),
+      NacaFoilMath.camberY(i, c, t, m, p),
       ]);
     }
-
-    console.log(c, res, this.upper);
 
     // Lower surface
-    for (let i = c; i >= 0; i -= res) {
+    for (let i = 0; i <= c; i += res) {
       this.lower.push([
-        NacaFoilMath.camberX(i + shift, c, t, m, p, false),
-        NacaFoilMath.camberY(i, c, t, m, p, false),
+      NacaFoilMath.camberX(i + shift, c, t, m, p, false),
+      NacaFoilMath.camberY(i, c, t, m, p, false),
       ]);
     }
 
-    // Ensure leading edge connection
-    for (let i = 0; i < c; i += res) {
-      let leadingEdgeXUpper = NacaFoilMath.camberX(shift + i, c, t, m, p);
-      let leadingEdgeYUpper = NacaFoilMath.camberY(0 + i, c, t, m, p);
-      let leadingEdgeXLower = NacaFoilMath.camberX(
-        shift + i,
-        c,
-        t,
-        m,
-        p,
-        false,
-      );
-      let leadingEdgeYLower = NacaFoilMath.camberY(0 + i, c, t, m, p, false);
+    // Reverse lower surface to ensure counter-clockwise order
+    this.lower.reverse();
 
-      // Add both upper and lower leading edge points
-      this.leadingEdge.push([leadingEdgeXUpper, leadingEdgeYUpper]);
-      this.leadingEdge.push([leadingEdgeXLower, leadingEdgeYLower]);
+    // Connect leading edge into a single shape
+    const leadingEdge: [number, number][] = [];
+
+    this.points = [...this.upper, ...leadingEdge, ...this.lower].sort((a, b) =>
+      Math.atan2(a[1], a[0]) - Math.atan2(b[1], b[0])
+    );
+
+    // Generate centerline points
+    this.core = [];
+    for (let i = 0; i <= c; i += 0.3) {
+      this.core.push([i + shift, NacaFoilMath.camberY(i, c, t, m, p)]);
     }
 
-    this.upper = this.upper
-      .filter((point) => !isNaN(point[0]) && !isNaN(point[1]))
-      .map((point) => [point[0], point[1]]);
-
-    this.lower = this.lower
-      .filter((point) => !isNaN(point[0]) && !isNaN(point[1]))
-      .map((point) => [point[0], point[1]]);
-
-    this.leadingEdge = this.leadingEdge
-      .filter((point) => !isNaN(point[0]) && !isNaN(point[1]))
-      .map((point) => [point[0], point[1]]);
-
-    this.points = this.upper.concat(this.lower).concat(this.leadingEdge);
-
+    this.core = this.core.filter(([x, y]) => !isNaN(x) && !isNaN(y));
     this.points = this.points
-      .filter((point) => !isNaN(point[0]) && !isNaN(point[1]))
-      .map((point) => [point[0], point[1]]);
+      .filter(([x, y]) => !isNaN(x) && !isNaN(y))
+      .filter((point, index, array) =>
+        index === 0 || Math.hypot(point[0] - array[index - 1][0], point[1] - array[index - 1][1]) > 1e-6
+      );
 
-    this.points = NacaFoilMath.convexHull(this.points);
-
-    this.points = this.points
-      .filter((point) => !isNaN(point[0]) && !isNaN(point[1]))
-      .map((point) => [point[0], point[1]]);
+    this.chord = chord;
+    this.xyRatio = chord/3;
   }
 
   getUpper(
@@ -256,16 +170,14 @@ export class NacaFoil {
     return this.upper.map((point) => transform([point[0], point[1]], scale));
   }
 
-  getLeadingEdge(
+  getCore(
     scale: number = 1,
     transform: Function = (p: [number, number], scale: number) => [
       p[0] * scale,
       p[1] * -scale,
     ],
   ) {
-    return this.leadingEdge.map((point) =>
-      transform([point[0], point[1]], scale),
-    );
+    return this.core.map((point) => transform([point[0], point[1]], scale));
   }
 
   getPoints(sampled: boolean = false): [number, number][] {

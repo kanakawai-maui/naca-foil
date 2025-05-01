@@ -1,17 +1,20 @@
 import { Vector2NacaFoil } from './vector';
-import { NacaCode } from './types';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import * as THREE from "three";
-export declare class NacaFoilScene {
+export declare class Scene {
     camera: THREE.PerspectiveCamera;
     scene: THREE.Scene;
+    settings: {
+        nacaCode: string;
+        chord: number;
+        particleSpeed: number;
+        airFriction: number;
+        reset: () => void;
+    };
     renderer: THREE.WebGLRenderer;
     clock: THREE.Clock;
     controls: OrbitControls;
     constructor(id?: string);
-    _clear(): void;
-    update(naca_code: NacaCode, camber?: number, extrude_depth?: number): void;
-    getGlow(foil: Vector2NacaFoil, position: "upper" | "lower" | "leadingedge", depth?: number): THREE.Points<THREE.ExtrudeGeometry, THREE.PointsMaterial, THREE.Object3DEventMap>;
-    getCurve: (point2D: [number, number][], closed?: boolean) => THREE.CatmullRomCurve3;
-    cnoise: (vector: THREE.Vector3) => number;
+    update(): void;
+    getFoilMesh(foil: Vector2NacaFoil, extrude_depth?: number): THREE.Mesh<THREE.ExtrudeGeometry, THREE.MeshStandardMaterial, THREE.Object3DEventMap>;
 }

@@ -1,17 +1,54 @@
 import { Vector2NacaFoil } from "./vector";
 import * as THREE from "three";
-import { NacaCode } from "./types";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
+import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass";
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass";
+import * as RAPIER from "@dimforge/rapier3d";
+import GUI from "lil-gui";
+import {ShaderPass} from "three/examples/jsm/postprocessing/ShaderPass";
+// Add an event listener to reset the scene when settings change
+
+
+
+const boundingSpheres: THREE.Sphere[] = [];
+
 
 // Create Three.js scene
-export class NacaFoilScene {
+export class Scene {
   camera: THREE.PerspectiveCamera;
   scene: THREE.Scene;
+  settings: {
+    nacaCode: string;
+    chord: number;
+    particleSpeed: number;
+    airFriction: number;
+    reset: () => void;
+  };
   renderer: THREE.WebGLRenderer;
   clock: THREE.Clock = new THREE.Clock();
   controls: OrbitControls;
 
   constructor(id: string = "naca-foil") {
+    // Load the saved NACA code from localStorage if available
+    const savedNacaCode = localStorage.getItem("nacaCode") || '0015';
+    console.log("Saved NACA code:", savedNacaCode);
+    const savedChord = localStorage.getItem("chord") || '8';
+    console.log("Saved chord:", savedChord);
+    const savedAirFriction = localStorage.getItem("airFriction") || '0.6';
+    console.log("Saved air friction:", savedAirFriction);
+    this.settings = {
+      nacaCode: savedNacaCode || "2412",
+      chord: parseInt(savedChord) || 10,
+      particleSpeed: 2.1,
+      airFriction: parseFloat(savedAirFriction) || 0.6,
+      reset: () => {
+        localStorage.removeItem("nacaCode");
+        localStorage.removeItem("chord");
+        localStorage.removeItem("airFriction");
+        location.reload(); // Refresh the page
+      },
+    };
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(
       50,
@@ -27,339 +64,478 @@ export class NacaFoilScene {
     } else {
       console.error(`Container with id "${id}" not found.`);
     }
-    this.scene.background = new THREE.Color(0x1e90ff); // Ocean blue color
-    this.scene.fog = new THREE.FogExp2("black", 0.00002);
+    this.scene.background = new THREE.Color(0x000000); // Ocean blue color
     // 2. Initiate FlyControls with various params
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-
     // An axis object to visualize the 3 axes in a simple way.
     // sThe X axis is red. The Y axis is green. The Z axis is blue.
     const axesHelper = new THREE.AxesHelper( 5 );
-    this.scene.add( axesHelper );
 
-    const ocean = this.getOceanMesh(1024);
-
-    ocean.scale.set(100, 100, 1); // Scale the ground to make it appear larger
-
-    this.scene.add(ocean);
+    this.camera.position.z -= 40;
+    // this.scene.add(axesHelper);
+    const gui = new GUI();
+      gui.add(this.settings, "nacaCode").name("NACA Code").onChange((newValue: string) => {
+        if (newValue.length >= 4) {
+          localStorage.setItem("nacaCode", newValue); // Save the new value to localStorage
+          location.reload(); // Refresh the page
+        }
+      });
+      gui.add(this.settings, "chord", 1, 10, 1).name("Chord").onChange((newValue: number) => {
+        localStorage.setItem("chord", newValue.toString()); // Save the new value to localStorage
+        location.reload(); // Refresh the page
+      });
+      gui.add(this.settings, "particleSpeed", 0.1, 10, 0.1).name("Particle Speed");
+      gui.add(this.settings, "airFriction", 0, 1, 0.01).name("Air Friction").onChange((newValue: number) => {
+        localStorage.setItem("airFriction", newValue.toString()); // Save the new value to localStorage
+        location.reload(); // Refresh the page
+      });
+      gui.add(this.settings, "reset").name("Reset").onChange(() => {
+        localStorage.removeItem("nacaCode");
+        localStorage.removeItem("chord");
+        localStorage.removeItem("airFriction");
+        location.reload(); // Refresh the page
+      });
   }
 
-  update(
-    naca_code: NacaCode,
-    depth: number = 10,
-    chord: number = 10
-  ) {
-    this.camera.position.z -= 40;
+  update() {
+
+    const rapierWorld = new RAPIER.World({ x: 0, y: 0, z: 0 });
 
     const { camera, scene, renderer } = this;
 
-    const resolution = 0.1;
+    const resolution = 0.04;
 
-    const vectors = new Vector2NacaFoil(chord, naca_code, resolution);
+    const depth = 10;
+
+    console.log("NACA code:", this.settings.nacaCode);
+
+    const vectors = new Vector2NacaFoil(this.settings.chord, this.settings.nacaCode, resolution);
 
     const foil = this.getFoilMesh(vectors, depth);
 
+    foil.name = "foil"; // Assign a unique name
+
     scene.add(foil);
 
-    /*
-    const g1 = this.getGlow(vectors, "upper", depth);
-    const g2 = this.getGlow(vectors, "lower", depth);
-    const g3 = this.getGlow(vectors, "leadingedge", depth);
+    const skyColor = 0xB1E1FF; // light blue
+    const groundColor = 0xB97A20; // brownish orange
+    const hemisphereLight = new THREE.HemisphereLight( skyColor, groundColor, 1 );
+    scene.add( hemisphereLight );
 
-    scene.add(g1);
-    scene.add(g2);
-    scene.add(g3);
-    */
-
-    const sunlight = new THREE.DirectionalLight(0xfffffb, 0.9);
-    sunlight.position.set(200, 1000, 900);
+    const sunlight = new THREE.DirectionalLight(0xfffffb, 1.5); // Increased intensity
+    sunlight.position.set(2000, 1000, 9000);
     sunlight.castShadow = true;
 
     sunlight.shadow.mapSize.width = 10024;
     sunlight.shadow.mapSize.height = 1024;
     sunlight.shadow.camera.near = 10;
     sunlight.shadow.camera.far = 1000;
-    sunlight.intensity = 1;
+    sunlight.intensity = 1.5; // Increased intensity
     sunlight.castShadow = true;
     scene.add(sunlight);
+    
+    const upperDirectional = new THREE.DirectionalLight(0xFFFFFF, 5); // Increased intensity
+    upperDirectional.position.set(100, 200, -400);
+    scene.add(upperDirectional);
 
-    const spotLight = new THREE.SpotLight(0xadd8e6, 0.7);
-    spotLight.position.set(500, 500, 500);
-    spotLight.angle = Math.PI / 6;
-    spotLight.penumbra = 0.1;
-    spotLight.decay = 2;
-    spotLight.distance = 1500;
-    spotLight.castShadow = true;
-    scene.add(spotLight);
+    const lowerDirectional = new THREE.DirectionalLight(0xFFFFFF, 5); // Increased intensity
+    lowerDirectional.position.set(-100, -200, 400);
+    scene.add(lowerDirectional);
 
-    const al1 = new THREE.AmbientLight(0x0000ff, 0.9); // Soft ambient light
-    scene.add(al1);
+    const upperProbe = new THREE.LightProbe(new THREE.SphericalHarmonics3(), 2); // Increased intensity
+    upperProbe.position.set(10, 20, 40);
+    scene.add(upperProbe);
 
-    const al2 = new THREE.AmbientLight(0xff0000, 0.9); // Soft ambient light
-    scene.add(al2);
+    const lowerProbe = new THREE.LightProbe(new THREE.SphericalHarmonics3(), 2); // Increased intensity
+    lowerProbe.position.set(-10, -20, -40);
+    scene.add(lowerProbe);
 
-    const al3 = new THREE.AmbientLight(0x00ff00, 0.9); // Soft ambient light
-    scene.add(al3);
+    // Add a wind tunnel-like background
+    const tunnelTexture = new THREE.TextureLoader().load(
+      "https://threejs.org/examples/textures/uv_grid_opengl.jpg"
+    );
+    tunnelTexture.wrapS = THREE.RepeatWrapping;
+    tunnelTexture.wrapT = THREE.RepeatWrapping;
+    tunnelTexture.repeat.set(7, 1);
 
-    const hemisphereLight = new THREE.HemisphereLight(0x0000ff, 0x00ff00, 0.9);
-    scene.add(hemisphereLight);
+    const tunnelMaterial = new THREE.MeshBasicMaterial({
+      map: tunnelTexture,
+      side: THREE.BackSide,
+      color: new THREE.Color(0x005249), // Dark blue-grey color
+    });
+
+    const tunnelGeometry = new THREE.CylinderGeometry(20, 20, 2000, 32, 1, false);
+    const tunnelMesh = new THREE.Mesh(tunnelGeometry, tunnelMaterial);
+    tunnelMesh.rotation.z = Math.PI / 2; // Rotate to align with the scene
+    tunnelMesh.position.set(0, 0, this.settings.chord / 2); // Center the tunnel
+    scene.add(tunnelMesh);
+
+    // Restrict camera movement to stay within the tunnel
+    const tunnelRadius = 20;
+    const tunnelLength = 2000;
+    this.controls.maxDistance = 140;
+
+    this.controls.addEventListener("change", () => {
+      const cameraPosition = this.camera.position;
+
+      // Constrain camera to the tunnel's cylindrical bounds
+      const distanceFromCenter = Math.sqrt(cameraPosition.x ** 2 + cameraPosition.y ** 2);
+      if (distanceFromCenter > tunnelRadius) {
+      const scale = tunnelRadius / distanceFromCenter;
+      cameraPosition.x *= scale;
+      cameraPosition.y *= scale;
+      }
+
+      // Constrain camera along the tunnel's length
+      cameraPosition.z = Math.max(
+      -tunnelLength / 2 + this.settings.chord / 2,
+      Math.min(tunnelLength / 2 - this.settings.chord / 2, cameraPosition.z)
+      );
+    });
 
     // Create particles to flow over and under the foil
-    const particleCount = 500000;
-    const pg = new THREE.BufferGeometry();
+    const particleCount = 1200;
+    const particleGeometry = new THREE.BufferGeometry();
     const particlePositions = new Float32Array(particleCount * 3);
 
+    const fieldScalar = 4; // 2 or 4 are better values
+
+    // Set air friction (linear and angular damping) globally for all particles
+    // Set linear and angular damping based on air friction
+    const linearDamping = Math.max(0, 1 - this.settings.airFriction * 1.5); // Increased linear damping for stronger air resistance
+    const angularDamping = Math.max(0, 1 - this.settings.airFriction * 1.5); // Increased angular damping for stronger air resistance
+
+    console.log("Enhanced Linear Damping:", linearDamping, "Enhanced Angular Damping:", angularDamping); // Log enhanced damping values for debugging
+
     for (let i = 0; i < particleCount; i++) {
-      const x = Math.random() * chord * 2 - chord; // Spread particles within a cube along the x-axis
-      const y = Math.random() * chord * 2 - chord; // Spread particles within a cube along the y-axis
-      const z = Math.random() * chord * 2 - chord; // Spread particles within a cube along the z-axis
+      const x = Math.random() * this.settings.chord*6 * fieldScalar - this.settings.chord*6; // Spread particles within a cube along the x-axis
+      const y = Math.random() * depth * fieldScalar - depth; // Spread particles within a cube along the y-axis
+      const z = Math.random() * this.settings.chord * fieldScalar - this.settings.chord; // Spread particles within a cube along the z-axis
       particlePositions.set([x, y, z], i * 3);
     }
 
-    pg.setAttribute(
+    particleGeometry.setAttribute(
       "position",
       new THREE.BufferAttribute(particlePositions, 3)
     );
-
     const particleMaterial = new THREE.PointsMaterial({
-      color: 0xffffff,
-      size: 0.1,
-      opacity: 0.8,
-      blending: THREE.AdditiveBlending, // Additive blending for glow effect
+      vertexColors: true, // Enable vertex colors to allow color blending
+      size: 3.0, // Slightly larger size for a blurrier effect
+      opacity: 0.9, // More transparent for a softer, blurry look
+      transparent: true, // Enable transparency
+      blending: THREE.AdditiveBlending, // Additive blending for a glowing effect
+      depthWrite: false, // Disable depth writing for a smoother appearance
+      sizeAttenuation: true, // Make particles appear more spherical
     });
 
-    const colors = new Float32Array(pg.attributes.position.count * 3);
+    particleMaterial.map = new THREE.TextureLoader().load(
+      "https://threejs.org/examples/textures/sprites/circle.png"
+    );
+    particleMaterial.map.wrapS = THREE.ClampToEdgeWrapping;
+    particleMaterial.map.wrapT = THREE.ClampToEdgeWrapping;
+    particleMaterial.map.minFilter = THREE.LinearFilter;
+    // Add fog to obscure edges of the scene
+    const fogColor = new THREE.Color(0x0049FF); // Match the tunnel's color for a cohesive look
+    const fogNear = 30;
+    const fogFar = 200;
+    scene.fog = new THREE.Fog(fogColor, fogNear, fogFar);
+
+    const colors = new Float32Array(particleGeometry.attributes.position.count * 3);
     for (let i = 0; i < colors.length; i += 3) {
-      const y = pg.attributes.position.getY(i / 3);
-      if (y >= 0) {
-        colors[i] = 1.0; // Red
-        colors[i + 1] = 0.0; // Green
-        colors[i + 2] = 0.3; // Blue
-      } else {
-        colors[i] = 0.0; // Red
-        colors[i + 1] = 0.0; // Green
-        colors[i + 2] = 1.0; // Blue
-      }
+      colors[i] = 0.01; // Red
+      colors[i + 1] = 0.01; // Green
+      colors[i + 2] = 0.1; // Blue
     }
-    pg.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+    particleGeometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
     particleMaterial.vertexColors = true;
     particleMaterial.needsUpdate = true;
 
-    const particles = new THREE.Points(pg, particleMaterial);
+    const particles = new THREE.Points(particleGeometry, particleMaterial);
     scene.add(particles);
 
-    const cloudGeo = new THREE.SphereGeometry(32, 32, 32);
+    const particleBodies: RAPIER.RigidBody[] = [];
+    for (let i = 0; i < particleCount; i++) {
+      const index = i * 3;
+      const x = particlePositions[index];
+      const y = particlePositions[index + 1];
+      const z = particlePositions[index + 2];
 
-    const cloudMat = new THREE.MeshStandardMaterial({
-      transparent: true,
-      opacity: 0.8,
-      blending: THREE.AdditiveBlending, // Additive blending for glow effect
-      depthWrite: true,
+      const rigidBodyDesc = RAPIER.RigidBodyDesc.dynamic().setTranslation(x, y, z);
+      const rigidBody = rapierWorld.createRigidBody(rigidBodyDesc);
+
+      const colliderDesc = RAPIER.ColliderDesc.ball(1); // Small radius for particles
+      const collider = rapierWorld.createCollider(colliderDesc, rigidBody);
+      if (!collider) {
+      console.error("Failed to create collider for the rigid body.");
+      }
+
+      // Apply air friction to the particle's velocity
+      rigidBody.setLinearDamping(linearDamping); // Set linear damping for air resistance
+      rigidBody.setAngularDamping(angularDamping); // Set angular damping for air resistance
+
+      particleBodies.push(rigidBody);
+    }
+
+    // Create a group of overlapping bounding spheres representing the foil
+    const foilVertices = vectors.getCoreVectors();
+
+    const boundingSphereGroup = new THREE.Group();
+    
+
+    for (let i = 0; i < foilVertices.length; i += 1) {
+      for (let z = -depth/2; z <= depth/2; z += depth / 20) {
+      const vertex = new THREE.Vector3(
+        foilVertices[i].x,
+        0,
+        z+depth/2
+      );
+
+      const radii = Math.abs((foilVertices[i].y)); // Use 1/2 the difference between upper and lower edges as the radius
+
+      const sphere = new THREE.Sphere(vertex, radii); // Use 1/2 the absolute value of y as the radius
+      boundingSpheres.push(sphere);
+      const sphereMesh = new THREE.Mesh(
+        new THREE.SphereGeometry(radii, 16, 16),
+        new THREE.MeshBasicMaterial({ color: 0x101010, wireframe: true })
+      );
+      sphereMesh.position.copy(vertex);
+      boundingSphereGroup.add(sphereMesh);
+
+      // Create a Rapier rigid body and collider for the sphere
+      const rigidBodyDesc = RAPIER.RigidBodyDesc.dynamic().setTranslation(vertex.x, vertex.y, vertex.z);
+      const rigidBody = rapierWorld.createRigidBody(rigidBodyDesc);
+
+      const colliderDesc = RAPIER.ColliderDesc.ball(radii);
+      rapierWorld.createCollider(colliderDesc, rigidBody);
+      }
+    }
+
+    // Add Unreal-style post-processing effects
+    const unrealBloomPass = new UnrealBloomPass(
+      new THREE.Vector2(window.innerWidth, window.innerHeight),
+      0.09, // strength (reduced for less intensity)
+      0.9, // radius
+      0.25 // threshold
+    );
+
+    const composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));
+    composer.addPass(unrealBloomPass);
+
+    // Add TiltShift effect
+    const tiltShiftPass = new ShaderPass({
+      uniforms: {
+      tDiffuse: { value: null },
+      focus: { value: Math.max(0.6, 0.5 + (this.settings.particleSpeed - 2.1) * 0.05) }, // Reduced focus adjustment
+      maxblur: { value: Math.min(0.5, 0.01 + (this.settings.particleSpeed) * 0.01) }, // Reduced maxblur for less blur
+      aspect: { value: window.innerWidth / window.innerHeight },
+      },
+      vertexShader: `
+      varying vec2 vUv;
+      void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+      `,
+      fragmentShader: `
+      uniform sampler2D tDiffuse;
+      uniform float focus;
+      uniform float maxblur;
+      uniform float aspect;
+      varying vec2 vUv;
+
+      void main() {
+      vec4 color = vec4(0.0);
+      float h = focus - vUv.y;
+      float blur = maxblur * abs(h);
+      vec2 offset = vec2(blur / aspect, blur);
+      color += texture2D(tDiffuse, vUv + offset) * 0.3; // Adjusted weights for a lighter effect
+      color += texture2D(tDiffuse, vUv - offset) * 0.3; // Adjusted weights for a lighter effect
+      color += texture2D(tDiffuse, vUv) * 0.4; // Adjusted weights for a lighter effect
+      gl_FragColor = color;
+      }
+      `,
     });
+    composer.addPass(tiltShiftPass);
 
-    // const clouds: Array<THREE.Mesh> = [];
+    // Add bounding spheres to the scene for visualization
+    // scene.add(boundingSphereGroup);
+
 
     const animate = () => {
       requestAnimationFrame(animate);
 
       const delta = this.clock.getDelta();
 
-      const time = Date.now();
-      const floor = Math.floor(time);
+      const positions = particleGeometry.attributes.position.array;
 
-      const seed = Math.random();
+      // Update particle positions based on Rapier physics simulation
+      rapierWorld.step();
 
-      /*
-      if (floor % 20 === 0) {
-        if (seed > 0.7) {
-          const mat = cloudMat.clone();
-          const geo = cloudGeo.clone();
-          const cloud = new THREE.Mesh(geo, mat);
-          const positionAttribute = geo.attributes.position;
-          const noiseFactor = 5; // Adjust for more or less irregularity
+      // Make the foil tip up and down
+      foil.rotation.z = Math.sin(this.clock.elapsedTime * this.settings.particleSpeed) * (0.5 / this.settings.particleSpeed); // Oscillate around the x-axis with smaller amplitude as speed increases
+      foil.position.y = Math.cos(this.clock.elapsedTime * this.settings.particleSpeed) * (5 / this.settings.particleSpeed); // Oscillate around the x-axis
 
-          for (let i = 0; i < positionAttribute.count; i++) {
-            const x = positionAttribute.getX(i);
-            const y = positionAttribute.getY(i);
-            const z = positionAttribute.getZ(i);
+      // Update boundingSphereGroup physics
+      boundingSphereGroup.rotation.z = Math.sin(this.clock.elapsedTime * this.settings.particleSpeed) * 0.1;
+      boundingSphereGroup.position.y = Math.cos(this.clock.elapsedTime * this.settings.particleSpeed) * 1;
 
-            const offsetX = (Math.random() - 0.5) * noiseFactor;
-            const offsetY = (Math.random() - 0.5) * noiseFactor;
-            const offsetZ = (Math.random() - 0.5) * noiseFactor;
+      // Sync particle positions with Rapier rigid bodies
+      for (let i = 0; i < particleCount; i++) {
+      const rigidBody = particleBodies[i];
+      const translation = rigidBody.translation();
+      const index = i * 3;
 
-            positionAttribute.setXYZ(i, x + offsetX, y + offsetY, z + offsetZ);
-          }
+      // Move particles from right to left (positive x direction)
+      let newX = translation.x + this.settings.particleSpeed;
 
-          positionAttribute.needsUpdate = true;
-         }} 
-          cloud.position.set(
-            -1500/2, // Spread clouds across the front in x-axis
-            Math.random() * 10 + 10, // Position clouds slightly above the horizon in y-axis
-            Math.random() * 10 - 100 // Keep clouds in a narrow band along the z-axis
-              );
-              cloud.name = `cloud-${time}`;
-              cloud.scale.set(
-            Math.random() * 1 + 0.1, // Random scale
-            Math.random() * 0.1 + 0.1,
-            Math.random() * 1 + 0.1
-              );
-              cloud.castShadow = true;
-              cloud.material.vertexColors = true;
-              cloud.receiveShadow = true;
-              cloud.material.color.setHSL(Math.random(), 0.5, 0.5);
-              cloud.material.needsUpdate = true;
+      // Wrap particles around to keep them within bounds
+      if (newX > this.settings.chord + 100) {
+        newX = Math.random() * this.settings.chord / 2 * fieldScalar - this.settings.chord / 2 + (-100);
+        const newY = Math.random() * depth * fieldScalar - depth + (-10);
+        const newZ = Math.random() * this.settings.chord / 2 * 2 * fieldScalar - this.settings.chord / 2 + (-10);
+        rigidBody.setTranslation({ x: newX, y: newY, z: newZ }, true);
+        colors[index] = 0.001; // Red
+        colors[index + 1] = 0.005; // Green
+        colors[index + 2] = 0.1; // Blue
+      } else {
+        rigidBody.setTranslation({ x: newX, y: translation.y, z: translation.z }, true);
+      }
 
-              clouds.unshift(cloud);
+      // Check for collisions with bounding spheres
+      for (const sphere of boundingSpheres) {
+        const sphereCenter = new THREE.Vector3(
+        sphere.center.x - (4 / this.settings.particleSpeed),
+        sphere.center.y,
+        sphere.center.z
+        );
+        const particlePosition = new THREE.Vector3(
+        translation.x,
+        translation.y,
+        translation.z
+        );
+        const distance = sphereCenter.distanceTo(particlePosition);
 
-              this.scene.add(cloud);
-              if (clouds.length >= 30) {
-            const last = clouds.pop();
-            if (last) {
-              this.scene.remove(last);
-            }
-              }
-            }
-          }
-          */
-    
-          const f = time * 0.002;
-          const aoa = Math.sin(f);
-          
-          const liftFactor = 1.5; // Increased lift effect for quicker ascent
-          const smoothFactor = 0.02; // Adjust for smoother oscillation
+        // Update particle color based on proximity and foil rotation
+        const maxDistance = sphere.radius * (40 / this.settings.particleSpeed),
+          intensity = 1 - Math.min(distance / maxDistance, 1),
+          iscalar = foil.rotation.z > 0.01 ? intensity : 1 - intensity;
 
-          if(aoa > 0.5) {
-            foil.rotation.z += smoothFactor * Math.sin(f) / 5 * (aoa > 0.5 ? 1 : -1);
-            foil.position.y += smoothFactor * Math.cos(f) * (liftFactor) * (aoa > 0.5 ? 1 : -1);
-          } else { 
-            foil.rotation.z -= smoothFactor * Math.sin(f) / 5 * (aoa > 0.5 ? 1 : -1);
-            foil.position.y -= smoothFactor * Math.cos(f) * (liftFactor) * (aoa > 0.5 ? 1 : -1);
-          }
+        if (distance <= sphere.radius * ((this.settings.airFriction*10)^2)) {
+        // Calculate impulse based on collision normal
+        const normal = particlePosition.clone().sub(sphereCenter).normalize();
+        const impulse = normal.multiplyScalar(this.settings.particleSpeed * 0.9);
+        rigidBody.applyImpulse(
+          { x: impulse.x * (intensity^2), y: impulse.y, z: impulse.z },
+          true
+        );
 
-          // Animate particles to flow over and under the foil
-          const particleSpeed = 0.05;
-            const animateParticles = () => {
-            let particleGeometry = pg.clone()
-            const positions = particleGeometry.attributes.position.array;
-            for (let i = 0; i < particleCount; i++) {
-              const index = i * 3;
-              const x = positions[index];
-              const y = positions[index + 1];
-              const z = positions[index + 2];
+        const offset = new THREE.Vector3(0, sphere.radius, 0);
+        const newPosition = particlePosition.clone().add(offset);
+        const yimpulse = new THREE.Vector3(0, 0, 0);
 
-              // Simulate fluid-like behavior with velocity and turbulence
-              const velocity = new THREE.Vector3(
-              (foil.position.x - x) * 0.01, // Adjust x velocity to simulate flow
-              (foil.position.y - y) * 0.01, // Adjust y velocity to simulate flow
-              (Math.random() - 0.5) * 0.02 // Add slight random z velocity for turbulence
-              ).normalize().multiplyScalar(particleSpeed);
+        // Ensure the particle is displaced based on its position relative to the sphere
+        const leadingEdgeOffset = foil.position.x - this.settings.chord / 2; // Calculate leading edge offset
+        if (particlePosition.x < leadingEdgeOffset) {
+          // If the particle is near the leading edge, apply a stronger upward impulse
+          yimpulse.y = Math.abs(newPosition.x) * 0.2; // Increase y impulse near the leading edge
+          rigidBody.setTranslation(
+            { x: particlePosition.x, y: particlePosition.y + 0.2, z: particlePosition.z },
+            true
+          );
+        } else if (particlePosition.y > sphere.radius) {
+          yimpulse.y = newPosition.x * 0.1; // Increase y as x increases
+          rigidBody.setTranslation(
+            { x: particlePosition.x, y: particlePosition.y + 0.1, z: particlePosition.z },
+            true
+          );
+        } else {
+          yimpulse.y = -newPosition.x * 0.1; // Decrease y as x increases
+          rigidBody.setTranslation(
+            { x: particlePosition.x, y: particlePosition.y - 0.1, z: particlePosition.z },
+            true
+          );
+        }
 
-              positions[index] += velocity.x;
-              positions[index + 1] += velocity.y;
-              positions[index + 2] += velocity.z;
+        // Add random turbulence
+        if (Math.random() < 0.2) {
+          const turbulence = new THREE.Vector3(
+          (Math.random() - 0.5) * 0.5,
+          (Math.random() - 0.5) * 0.5,
+          (Math.random() - 0.5) * 0.5
+          );
+          rigidBody.applyImpulse(
+          { x: turbulence.x, y: turbulence.y, z: turbulence.z },
+          false
+          );
+        }
 
-              // Add a damping effect to simulate fluid resistance
-              positions[index] *= 0.995;
-              positions[index + 1] *= 0.995;
-              positions[index + 2] *= 0.995;
+        // Apply wind acceleration
+        const foilCenter = boundingSphereGroup.position;
+        const windAcceleration = new THREE.Vector3(
+          0.5,
+          (foilCenter.y / 10 - translation.y),
+          (foilCenter.z - translation.z) * 0.02
+        );
+        rigidBody.applyImpulse(
+          { x: windAcceleration.x, y: windAcceleration.y, z: windAcceleration.z },
+          true
+        );
 
-              // Wrap particles around to keep them within bounds
-              if (positions[index] > chord || positions[index] < -chord) {
-              positions[index] = Math.random() * chord * 2 - chord;
-              }
-              if (positions[index + 1] > chord || positions[index + 1] < -chord) {
-              positions[index + 1] = Math.random() * chord * 2 - chord;
-              }
-              if (positions[index + 2] > chord || positions[index + 2] < -chord) {
-              positions[index + 2] = Math.random() * chord * 2 - chord;
-              }
-            }
-            positions[0] -= 0.1; // Move particles left along the x-axis
-            particleGeometry.attributes.position.needsUpdate = true;
-          };
-          
+        // Apply lift force
+        const liftForce = new THREE.Vector3(0, Math.abs(foil.rotation.z) * 0.9, 0);
+        rigidBody.applyImpulse(
+          { x: liftForce.x, y: liftForce.y, z: liftForce.z },
+          true
+        );
 
-          animateParticles();
+        // Add swirling effect near the sphere
+        const swirlRadius = sphere.radius * (6 / this.settings.particleSpeed);
+        const toCenter = particlePosition.clone().sub(sphereCenter);
+        if (toCenter.length() <= swirlRadius) {
+          const swirlVector = new THREE.Vector3(-toCenter.z, 0, toCenter.x).normalize();
+          const swirlEffect = swirlVector.multiplyScalar(
+          0.9 * (1 - toCenter.length() / swirlRadius)
+          );
+          rigidBody.applyImpulse(
+          { x: swirlEffect.x, y: swirlEffect.y, z: swirlEffect.z },
+          true
+          );
+        }
 
-          this.controls.update(delta);
-          renderer.render(scene, camera);
+        colors[index] = Math.min(1.0 * iscalar, 1);
+        colors[index + 1] = 0.01;
+        colors[index + 2] = Math.min(1.0 * intensity, 1);
+        }
+      }
+
+      particleGeometry.attributes.color.needsUpdate = true;
+
+      // Update particle positions based on rigid body translation
+      positions[index] = rigidBody.translation().x;
+      positions[index + 1] = rigidBody.translation().y;
+      positions[index + 2] = rigidBody.translation().z;
+      }
+
+      particleGeometry.attributes.position.needsUpdate = true;
+
+      this.controls.update(delta);
+      renderer.render(scene, camera);
+      composer.render(delta);
+      
     };
+
+    
+
     animate();
-  }
-
-  makeConvexPlane(plane: THREE.Mesh, radius: number = 100) {
-    // Ensure the plane is curved like the Earth's surface
-    const positionAttribute = plane.geometry.attributes.position;
-    for (let i = 0; i < positionAttribute.count; i++) {
-      const x = positionAttribute.getX(i);
-      const y = positionAttribute.getY(i);
-      const z = positionAttribute.getZ(i);
-
-      // Calculate the length of the vector from the origin
-      const length = Math.sqrt(x * x + y * y + z * z);
-
-      // Scale the vector to match the desired radius
-      const factor = radius / length;
-
-      positionAttribute.setX(i, x * factor);
-      positionAttribute.setY(i, y * factor);
-      positionAttribute.setZ(i, z * factor);
-    }
-    positionAttribute.needsUpdate = true;
-
-    // Recompute the normals for proper lighting
-    plane.geometry.computeVertexNormals();
-  }
-
-  getOceanMesh(width: number = 1024 * 7) {
-    const numSegments = width - 1; // We have one less vertex than pixel
-
-    var planeGeo = new THREE.PlaneGeometry(
-      width,
-      width,
-      numSegments,
-      numSegments,
-    );
-
-    const planeMat = new THREE.MeshStandardMaterial({
-      color: 0x1e90ff, // Ocean blue color
-      wireframe: false,
-      roughness: 0.45,
-      metalness: 0.99,
-      side: THREE.DoubleSide,
-      transparent: true,
-      opacity: 0.7,
-    });
-
-    const plane = new THREE.Mesh(planeGeo, planeMat);
-    plane.name = "ocean";
-
-    // Add wave-like displacement to simulate ocean surface
-    const positionAttribute = plane.geometry.attributes.position;
-    for (let i = 0; i < positionAttribute.count; i++) {
-      const x = positionAttribute.getX(i);
-      const y = positionAttribute.getY(i);
-      const z =
-      0.9 * Math.sin(x * 7 + Date.now()) +
-      0.5 * Math.cos(y * 5 + Date.now());
-      positionAttribute.setZ(i, z);
-    }
-
-    this.makeConvexPlane(plane, 100);
-
-    positionAttribute.needsUpdate = true;
-
-    plane.position.y = -100;
-
-    plane.rotation.set((Math.PI * 1.5) / 3, 0, 0);
-
-    return plane;
   }
 
   getFoilMesh(foil: Vector2NacaFoil, extrude_depth: number = 10) {
     const shape = new THREE.Shape(foil.getVectors());
+
     const geometry = new THREE.ExtrudeGeometry(shape, {
       depth: extrude_depth,
+      steps: 1,
       bevelEnabled: true,
     });
 
@@ -367,96 +543,10 @@ export class NacaFoilScene {
       color: 0xffffff,
       wireframe: false,
       side: THREE.DoubleSide,
-      roughness: 0.1,
+      roughness: 0.2,
       metalness: 0.9,
     });
     const foilMesh = new THREE.Mesh(geometry, material);
     return foilMesh;
   }
-
-  getGlow(
-    foil: Vector2NacaFoil,
-    position: "upper" | "lower" | "leadingedge",
-    depth: number = 10,
-  ) {
-    // Create a glow effect around the mesh using Points and a PointsMaterial
-    let glowShape = new THREE.Shape();
-    let closed = false;
-    let opacity = 0.2;
-    let points2D = foil.getPoints(true);
-    switch (position) {
-      case "upper":
-        points2D = foil.getUpper();
-        glowShape = new THREE.Shape(foil.getUpperVectors(1.5));
-        break;
-      case "lower":
-        points2D = foil.getLower();
-        glowShape = new THREE.Shape(foil.getLowerVectors(1.5));
-        break;
-      case "leadingedge":
-        points2D = foil.getLeadingEdge();
-        glowShape = new THREE.Shape(foil.getLeadingEdgeVectors(1.5));
-        closed = true;
-        opacity = 0.05;
-        break;
-      default:
-        console.warn("Invalid option for 'upper'");
-        break;
-    }
-
-    const curve = this.getCurve(points2D, closed);
-
-    const glowGeometry = new THREE.ExtrudeGeometry(glowShape, {
-      steps: 1000,
-      depth: depth,
-      bevelEnabled: false,
-      extrudePath: curve,
-    });
-
-    const glowMaterial = new THREE.PointsMaterial({
-      transparent: true,
-      opacity: opacity,
-      blending: THREE.AdditiveBlending, // Additive blending for glow effect
-      depthWrite: true,
-    });
-
-    const colors = new Float32Array(glowGeometry.attributes.position.count * 3);
-    for (let i = 0; i < colors.length; i += 3) {
-      if (position === "upper") {
-        colors[i] = 1.0; // Red
-        colors[i + 1] = 0.0; // Green
-        colors[i + 2] = 0.3; // Blue
-      } else if (position === "lower") {
-        colors[i] = 0.0; // Red
-        colors[i + 1] = 0.0; // Green
-        colors[i + 2] = 1.0; // Blue
-      } else if (position === "leadingedge") {
-        colors[i] = 0.0; // Red
-        colors[i + 1] = 1.0; // Green
-        colors[i + 2] = 0.3; // Blue
-      }
-    }
-    glowGeometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
-    glowMaterial.vertexColors = true;
-    glowMaterial.needsUpdate = true;
-
-    const glow = new THREE.Points(glowGeometry, glowMaterial);
-
-    return glow;
-  }
-
-  getCurve = (point2D: [number, number][], closed: boolean = false) => {
-    const points = point2D
-      .map(([x, y]) => new THREE.Vector3(x / 1 / 30, y / 1 / 30, 1))
-      .filter((_, i) => i % 5 === 0);
-    const closedSpline = new THREE.CatmullRomCurve3(points, true); // true for closed curve
-    closedSpline.curveType = "catmullrom";
-    closedSpline.closed = closed;
-    closedSpline.tension = 0.9; // Adjust tension for smoothness
-    return closedSpline;
-  };
-
-  cnoise = (vector: THREE.Vector3) => {
-    return Math.random() * Math.sin(Date.now() * 0.001) * vector.x * vector.y;
-  };
 }
