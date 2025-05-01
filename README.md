@@ -11,6 +11,10 @@ This project provides tools to generate NACA airfoil shapes, which are widely us
 - Generate precise NACA airfoil profiles based on user-specified parameters.
 - Interactive browser-based visualization for real-time feedback.
 - Easy-to-use interface for both beginners and advanced users.
+- Watch a demonstration of the tool in action:
+
+![NACA Airfoil Video](foil_video.mov)
+
 
 ### Getting Started
 

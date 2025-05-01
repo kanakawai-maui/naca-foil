@@ -33,7 +33,7 @@ export class Scene {
     // Load the saved NACA code from localStorage if available
     const savedNacaCode = localStorage.getItem("nacaCode") || '0015';
     console.log("Saved NACA code:", savedNacaCode);
-    const savedChord = localStorage.getItem("chord") || '8';
+    const savedChord = localStorage.getItem("chord") || '10';
     console.log("Saved chord:", savedChord);
     const savedAirFriction = localStorage.getItem("airFriction") || '0.6';
     console.log("Saved air friction:", savedAirFriction);
@@ -84,7 +84,7 @@ export class Scene {
         localStorage.setItem("chord", newValue.toString()); // Save the new value to localStorage
         location.reload(); // Refresh the page
       });
-      gui.add(this.settings, "particleSpeed", 0.1, 10, 0.1).name("Particle Speed");
+      gui.add(this.settings, "particleSpeed", 0.15, 10, 0.1).name("Particle Speed");
       gui.add(this.settings, "airFriction", 0, 1, 0.01).name("Air Friction").onChange((newValue: number) => {
         localStorage.setItem("airFriction", newValue.toString()); // Save the new value to localStorage
         location.reload(); // Refresh the page
