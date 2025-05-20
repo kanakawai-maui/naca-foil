@@ -124,12 +124,9 @@ export class NacaFoil {
     }
 
     // Reverse lower surface to ensure counter-clockwise order
-    this.lower.reverse();
+    //this.lower.reverse();
 
-    // Connect leading edge into a single shape
-    const leadingEdge: [number, number][] = [];
-
-    this.points = [...this.upper, ...leadingEdge, ...this.lower].sort((a, b) =>
+    this.points = [...this.upper, ...this.lower].sort((a, b) =>
       Math.atan2(a[1], a[0]) - Math.atan2(b[1], b[0])
     );
 

@@ -29,6 +29,28 @@ export class Scene {
   clock: THREE.Clock = new THREE.Clock();
   controls: OrbitControls;
 
+  /**
+   * Initializes the 3D scene for visualizing a NACA airfoil with interactive controls.
+   * 
+   * This constructor sets up the following:
+   * - Loads saved settings (`nacaCode`, `chord`, `airFriction`) from `localStorage` or uses default values.
+   * - Configures a Three.js scene, camera, and renderer.
+   * - Adds an interactive GUI for modifying airfoil parameters:
+   *   - `nacaCode`: The NACA airfoil code (e.g., "2412").
+   *   - `chord`: The chord length of the airfoil.
+   *   - `particleSpeed`: The speed of particles in the simulation.
+   *   - `airFriction`: The air friction coefficient.
+   *   - `reset`: Resets all settings to defaults and reloads the page.
+   * - Sets up orbit controls for camera manipulation.
+   * - Displays an optional axes helper for visualization.
+   * 
+   * @param id - The ID of the container element where the renderer's canvas will be appended. Defaults to `"naca-foil"`.
+   * 
+   * @remarks
+   * - Arrow keys can be used to adjust the foil's angle of attack.
+   * - The GUI allows real-time updates to the airfoil parameters, with changes saved to `localStorage`.
+   * - The scene background is set to black, and the camera is positioned to provide a clear view of the airfoil.
+   */
   constructor(id: string = "naca-foil") {
     // Load the saved NACA code from localStorage if available
     const savedNacaCode = localStorage.getItem("nacaCode") || '0015';
@@ -89,6 +111,10 @@ export class Scene {
         localStorage.setItem("airFriction", newValue.toString()); // Save the new value to localStorage
         location.reload(); // Refresh the page
       });
+      gui.add({ info: "Use Arrow Keys" }, "info")
+      .name("Angle of Attack")
+      .onChange(() => {});
+
       gui.add(this.settings, "reset").name("Reset").onChange(() => {
         localStorage.removeItem("nacaCode");
         localStorage.removeItem("chord");
@@ -194,7 +220,7 @@ export class Scene {
     });
 
     // Create particles to flow over and under the foil
-    const particleCount = 1200;
+    const particleCount = 1800;
     const particleGeometry = new THREE.BufferGeometry();
     const particlePositions = new Float32Array(particleCount * 3);
 
@@ -361,7 +387,38 @@ export class Scene {
     // Add bounding spheres to the scene for visualization
     // scene.add(boundingSphereGroup);
 
+    // Make the foil tip up and down based on arrow key input
+    const rotationFactor = 0.05; // Adjust amplitude
+    const distanceFactor = 0.5; // Adjust distance
+   
+    // Smoothly listen for arrow key input
+    let targetRotationZ = foil.rotation.z;
+    let targetPositionZ = foil.position.y;
 
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowLeft") {
+        targetRotationZ += rotationFactor; // Increase target rotation
+      } else if (event.key === "ArrowRight") {
+        targetRotationZ -= rotationFactor; // Increase target rotation
+      }
+      if (event.key === "ArrowUp") {
+          targetPositionZ += distanceFactor; // Increase target rotation
+        } else if (event.key === "ArrowDown") {
+          targetPositionZ -= distanceFactor; // Decrease target rotation
+        }
+    });
+
+    // Smoothly interpolate foil rotation
+    const smoothSpeed = 0.1;
+    const updateFoilRotationPosition = () => {
+      foil.rotation.z += (targetRotationZ - foil.rotation.z) * smoothSpeed;
+      foil.position.y += (targetPositionZ - foil.position.y) * smoothSpeed;
+      return [foil.rotation.z, foil.position.y];
+    };
+
+    
+
+    let nuTilde = 0;
     const animate = () => {
       requestAnimationFrame(animate);
 
@@ -372,13 +429,11 @@ export class Scene {
       // Update particle positions based on Rapier physics simulation
       rapierWorld.step();
 
-      // Make the foil tip up and down
-      foil.rotation.z = Math.sin(this.clock.elapsedTime * this.settings.particleSpeed) * (0.5 / this.settings.particleSpeed); // Oscillate around the x-axis with smaller amplitude as speed increases
-      foil.position.y = Math.cos(this.clock.elapsedTime * this.settings.particleSpeed) * (5 / this.settings.particleSpeed); // Oscillate around the x-axis
+      const [rotation, position] = updateFoilRotationPosition();
 
       // Update boundingSphereGroup physics
-      boundingSphereGroup.rotation.z = Math.sin(this.clock.elapsedTime * this.settings.particleSpeed) * 0.1;
-      boundingSphereGroup.position.y = Math.cos(this.clock.elapsedTime * this.settings.particleSpeed) * 1;
+      boundingSphereGroup.rotation.z = rotation;
+      boundingSphereGroup.position.y = position
 
       // Sync particle positions with Rapier rigid bodies
       for (let i = 0; i < particleCount; i++) {
@@ -405,8 +460,8 @@ export class Scene {
       // Check for collisions with bounding spheres
       for (const sphere of boundingSpheres) {
         const sphereCenter = new THREE.Vector3(
-        sphere.center.x - (4 / this.settings.particleSpeed),
-        sphere.center.y,
+        sphere.center.x,
+        foil.position.y,
         sphere.center.z
         );
         const particlePosition = new THREE.Vector3(
@@ -416,23 +471,67 @@ export class Scene {
         );
         const distance = sphereCenter.distanceTo(particlePosition);
 
-        // Update particle color based on proximity and foil rotation
-        const maxDistance = sphere.radius * (40 / this.settings.particleSpeed),
-          intensity = 1 - Math.min(distance / maxDistance, 1),
-          iscalar = foil.rotation.z > 0.01 ? intensity : 1 - intensity;
+        // Update particle color based on proximity, foil rotation, and foil position.y
+        const maxDistance = sphere.radius * (40 / this.settings.particleSpeed);
+        let intensity = 1 - Math.min(distance / maxDistance, 1);
+        const iscalar = foil.rotation.z > 0.01 ? intensity : 1 - intensity;
+
+        // Adjust intensity based on the foil's vertical position
+        const positionFactor = Math.abs(foil.position.y) / 10; // Normalize foil position.y
+        intensity = intensity * (1 - positionFactor);
 
         if (distance <= sphere.radius * ((this.settings.airFriction*10)^2)) {
         // Calculate impulse based on collision normal
-        const normal = particlePosition.clone().sub(sphereCenter).normalize();
-        const impulse = normal.multiplyScalar(this.settings.particleSpeed * 0.9);
-        rigidBody.applyImpulse(
-          { x: impulse.x * (intensity^2), y: impulse.y, z: impulse.z },
-          true
-        );
 
         const offset = new THREE.Vector3(0, sphere.radius, 0);
         const newPosition = particlePosition.clone().add(offset);
         const yimpulse = new THREE.Vector3(0, 0, 0);
+
+        // Apply Spalart-Allmaras turbulence model
+        nuTilde = Math.max(0, this.settings.airFriction * 0.1); // Turbulent viscosity-like term
+        const distanceToFoil = Math.max(0.001, distance); // Avoid division by zero
+        const viscosity = 0.0000181; // Dynamic viscosity of air (kg/m·s)
+        const density = 1.225; // Air density (kg/m³)
+
+        // Compute eddy viscosity using Spalart-Allmaras model
+        const chi = nuTilde / viscosity;
+        const fv1 = chi / (chi + Math.pow(chi, 3));
+        const eddyViscosity = nuTilde * fv1;
+
+        // Apply wind acceleration
+        const foilCenter = boundingSphereGroup.position;
+        const windAcceleration = new THREE.Vector3(
+          0.5,
+          (foilCenter.y / 10 - translation.y),
+          (foilCenter.z - translation.z) * 0.02
+        );
+        rigidBody.applyImpulse(
+          { x: windAcceleration.x, y: windAcceleration.y, z: windAcceleration.z },
+          true
+        );
+
+        const relativeVelocity = new THREE.Vector3(
+          rigidBody.linvel().x - windAcceleration.x,
+          rigidBody.linvel().y - windAcceleration.y,
+          rigidBody.linvel().z - windAcceleration.z
+        );
+        
+        const turbulentForce = relativeVelocity
+          .clone()
+          .multiplyScalar(-eddyViscosity / distanceToFoil);
+
+        rigidBody.applyImpulse(
+          { x: turbulentForce.x, y: turbulentForce.y, z: turbulentForce.z },
+          true
+        );
+
+        // Update nuTilde based on production and destruction terms
+        const production = eddyViscosity * Math.pow(relativeVelocity.length(), 2);
+        const destruction = (nuTilde * Math.pow(distanceToFoil, -2)) * density;
+        const dNuTilde = production - destruction;
+
+        // Adjust nuTilde for the next frame
+        nuTilde += dNuTilde * delta;
 
         // Ensure the particle is displaced based on its position relative to the sphere
         const leadingEdgeOffset = foil.position.x - this.settings.chord / 2; // Calculate leading edge offset
@@ -470,20 +569,8 @@ export class Scene {
           );
         }
 
-        // Apply wind acceleration
-        const foilCenter = boundingSphereGroup.position;
-        const windAcceleration = new THREE.Vector3(
-          0.5,
-          (foilCenter.y / 10 - translation.y),
-          (foilCenter.z - translation.z) * 0.02
-        );
-        rigidBody.applyImpulse(
-          { x: windAcceleration.x, y: windAcceleration.y, z: windAcceleration.z },
-          true
-        );
-
         // Apply lift force
-        const liftForce = new THREE.Vector3(0, Math.abs(foil.rotation.z) * 0.9, 0);
+        const liftForce = new THREE.Vector3(0, Math.abs(foil.rotation.z) * 2.9, 0);
         rigidBody.applyImpulse(
           { x: liftForce.x, y: liftForce.y, z: liftForce.z },
           true
@@ -520,12 +607,9 @@ export class Scene {
       particleGeometry.attributes.position.needsUpdate = true;
 
       this.controls.update(delta);
-      renderer.render(scene, camera);
       composer.render(delta);
       
     };
-
-    
 
     animate();
   }
