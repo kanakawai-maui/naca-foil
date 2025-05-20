@@ -6,9 +6,11 @@ export declare class Scene {
     scene: THREE.Scene;
     settings: {
         nacaCode: string;
+        compareNacaCode: string;
         chord: number;
         particleSpeed: number;
         airFriction: number;
+        particleCount: number;
         reset: () => void;
     };
     renderer: THREE.WebGLRenderer;

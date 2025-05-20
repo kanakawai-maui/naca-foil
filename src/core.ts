@@ -2,30 +2,35 @@
 export class NacaFoilMath {
 
     /**
-     * Calculates the Y-coordinate of a NACA airfoil at a given X-coordinate.
-     *
-     * @param x - The X-coordinate along the chord line of the airfoil.
-     * @param c - The chord length of the airfoil (distance from leading edge to trailing edge).
-     * @param t - The maximum thickness of the airfoil as a fraction of the chord length.
-     * @param closeAirfoils - A boolean indicating whether to use the closed trailing edge formula (default: true).
-     *                        If true, the trailing edge will be closed; otherwise, it will be slightly open.
-     * @returns The Y-coordinate of the airfoil at the given X-coordinate.
-     *
-     * @remarks
-     * - The chord (`c`) is the straight-line distance from the leading edge to the trailing edge of the airfoil.
-     * - The camber is not directly calculated in this function but is influenced by the thickness distribution (`t`).
-     */
-    static foilY(x: number, c: number, t: number, closeAirfoils = true) {
-        return (
-            5 *
-            t *
-            c *
-            (0.2969 * Math.sqrt(x / c) -
-            0.126 * (x / c) -
-            0.3516 * Math.pow(x / c, 2) +
-            0.2843 * Math.pow(x / c, 3) -
-            (closeAirfoils ? 0.1036 : 0.1015) * Math.pow(x / c, 4))
-        );
+      * Calculates the Y-coordinate of a NACA airfoil at a given X-coordinate.
+      *
+      * @param x - The X-coordinate along the chord line of the airfoil.
+      * @param c - The chord length of the airfoil (distance from leading edge to trailing edge).
+      * @param t - The maximum thickness of the airfoil as a fraction of the chord length.
+      * @param closeAirfoils - A boolean indicating whether to use the closed trailing edge formula (default: true).
+      *                        If true, the trailing edge will be closed; otherwise, it will be slightly open.
+      * @returns The Y-coordinate of the airfoil at the given X-coordinate.
+      *
+      * @remarks
+      * - The chord (`c`) is the straight-line distance from the leading edge to the trailing edge of the airfoil.
+      * - The camber is not directly calculated in this function but is influenced by the thickness distribution (`t`).
+      * - This implementation supports both 4-digit and 5-digit NACA airfoils. For 5-digit airfoils, the camber line
+      *   equations are adjusted to account for the more complex camber line used in these airfoils.
+      */
+    static foilY(x: number, c: number, t: number, closeAirfoils = true, isFiveDigit = false) {
+      const thicknessTerm = isFiveDigit
+        ? 0.2969 * Math.sqrt(x / c) -
+          0.126 * (x / c) -
+          0.3516 * Math.pow(x / c, 2) +
+          0.2843 * Math.pow(x / c, 3) -
+          (closeAirfoils ? 0.1036 : 0.1015) * Math.pow(x / c, 4)
+        : 0.2969 * Math.sqrt(x / c) -
+          0.126 * (x / c) -
+          0.3516 * Math.pow(x / c, 2) +
+          0.2843 * Math.pow(x / c, 3) -
+          (closeAirfoils ? 0.1036 : 0.1015) * Math.pow(x / c, 4);
+    
+      return 5 * t * c * thicknessTerm;
     }
 
     // Helper method to calculate the cross product of vectors
@@ -97,18 +102,40 @@ export class NacaFoil {
   _constructor(
     chord: number = 10,
     naca_code: string = "0015",
-    resolution: number = 10
-  ) {
+    resolution: number = 10,
+    
+    ) {
     let naca = parseInt(naca_code);
+    if (isNaN(naca)) {
+      throw new Error(`Invalid NACA code: ${naca_code}`);
+    }
+
     let c = chord;
     let t = (naca % 100) / 100;
-    let m = Math.floor((naca - (naca % 100)) / 1000) / 100;
-    let p = (((naca - (naca % 100)) / 100) % 10) / 10;
+    let m = 0;
+    let p = 0;
     let res = resolution;
+
+    if (naca_code.length === 4) {
+      // 4-digit NACA airfoil
+      m = Math.floor((naca - (naca % 100)) / 1000) / 100;
+      p = (((naca - (naca % 100)) / 100) % 10) / 10;
+    } else if (naca_code.length === 5) {
+      // 5-digit NACA airfoil
+      const firstDigit = Math.floor(naca / 10000);
+      const secondTwoDigits = Math.floor((naca % 10000) / 100);
+      const lastTwoDigits = naca % 100;
+
+      m = firstDigit * 0.02; // Maximum camber
+      p = secondTwoDigits * 0.05; // Position of maximum camber
+      t = lastTwoDigits / 100; // Thickness
+    } else {
+      throw new Error(`Unsupported NACA code length: ${naca_code}`);
+    }
 
     let shift = 0;
     // Upper surface
-    for (let i = 0; i <= c; i += res) {
+    for (let i = c; i >= 0; i -= res) {
       this.upper.push([
       NacaFoilMath.camberX(i + shift, c, t, m, p),
       NacaFoilMath.camberY(i, c, t, m, p),
@@ -123,13 +150,7 @@ export class NacaFoil {
       ]);
     }
 
-    // Reverse lower surface to ensure counter-clockwise order
-    //this.lower.reverse();
-
-    this.points = [...this.upper, ...this.lower].sort((a, b) =>
-      Math.atan2(a[1], a[0]) - Math.atan2(b[1], b[0])
-    );
-
+    this.points = [...this.upper, ...this.lower];
     // Generate centerline points
     this.core = [];
     for (let i = 0; i <= c; i += 0.3) {
@@ -140,11 +161,11 @@ export class NacaFoil {
     this.points = this.points
       .filter(([x, y]) => !isNaN(x) && !isNaN(y))
       .filter((point, index, array) =>
-        index === 0 || Math.hypot(point[0] - array[index - 1][0], point[1] - array[index - 1][1]) > 1e-6
+      index === 0 || Math.hypot(point[0] - array[index - 1][0], point[1] - array[index - 1][1]) > 1e-6
       );
 
     this.chord = chord;
-    this.xyRatio = chord/3;
+    this.xyRatio = chord / 3;
   }
 
   getUpper(
@@ -179,7 +200,7 @@ export class NacaFoil {
 
   getPoints(sampled: boolean = false): [number, number][] {
     if (sampled) {
-      return this.points.filter((_, index) => index % 1000 === 0);
+      return this.points.filter((_, index) => index % 10000 === 0);
     }
     return this.points;
   }

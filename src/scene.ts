@@ -20,9 +20,11 @@ export class Scene {
   scene: THREE.Scene;
   settings: {
     nacaCode: string;
+    compareNacaCode: string;
     chord: number;
     particleSpeed: number;
     airFriction: number;
+    particleCount: number;
     reset: () => void;
   };
   renderer: THREE.WebGLRenderer;
@@ -55,14 +57,20 @@ export class Scene {
     // Load the saved NACA code from localStorage if available
     const savedNacaCode = localStorage.getItem("nacaCode") || '0015';
     console.log("Saved NACA code:", savedNacaCode);
+    const savedCompareNacaCode = localStorage.getItem("compareNacaCode") || '0015';
+    console.log("Compare NACA code:", savedCompareNacaCode);
     const savedChord = localStorage.getItem("chord") || '10';
     console.log("Saved chord:", savedChord);
     const savedAirFriction = localStorage.getItem("airFriction") || '0.6';
     console.log("Saved air friction:", savedAirFriction);
+    const savedParticleCount = localStorage.getItem("particleCount") || '2800';
+    console.log("Saved particle count:", savedParticleCount);
     this.settings = {
       nacaCode: savedNacaCode || "2412",
+      compareNacaCode: savedCompareNacaCode || "23012",
       chord: parseInt(savedChord) || 10,
       particleSpeed: 2.1,
+      particleCount: parseInt(savedParticleCount) || 2800,
       airFriction: parseFloat(savedAirFriction) || 0.6,
       reset: () => {
         localStorage.removeItem("nacaCode");
@@ -97,9 +105,16 @@ export class Scene {
     // this.scene.add(axesHelper);
     const gui = new GUI();
       gui.add(this.settings, "nacaCode").name("NACA Code").onChange((newValue: string) => {
-        if (newValue.length >= 4) {
+        const isValidNacaCode = /^[0-9]{4,5}$/.test(newValue);
+        if (isValidNacaCode) {
           localStorage.setItem("nacaCode", newValue); // Save the new value to localStorage
-          location.reload(); // Refresh the page
+          if (newValue.length === 5) {
+            console.log(`Reducing particle count`);
+            localStorage.setItem("particleCount",  Math.min(this.settings.particleCount, Math.floor(1800 * 0.5)).toString()); // Save the new value to localStorage
+          } else {
+            localStorage.setItem("particleCount", "1800");
+          }
+          location.reload();
         }
       });
       gui.add(this.settings, "chord", 1, 10, 1).name("Chord").onChange((newValue: number) => {
@@ -111,9 +126,16 @@ export class Scene {
         localStorage.setItem("airFriction", newValue.toString()); // Save the new value to localStorage
         location.reload(); // Refresh the page
       });
-      gui.add({ info: "Use Arrow Keys" }, "info")
+      gui.add({ info: "←→ Use Arrow Keys" }, "info")
       .name("Angle of Attack")
-      .onChange(() => {});
+      .disable();
+      gui.add({ info: "↑↓ Use Arrow Keys" }, "info")
+      .name("Altitude")
+      .disable();
+      /*gui.add(this.settings, "compareNacaCode").name("Compare Last").onChange((newValue: string) => {
+        localStorage.setItem("compareNacaCode", newValue); // Save the NACA code if checked, otherwise clear
+        location.reload(); // Refresh the page
+      }).listen();*/
 
       gui.add(this.settings, "reset").name("Reset").onChange(() => {
         localStorage.removeItem("nacaCode");
@@ -136,12 +158,22 @@ export class Scene {
     console.log("NACA code:", this.settings.nacaCode);
 
     const vectors = new Vector2NacaFoil(this.settings.chord, this.settings.nacaCode, resolution);
+    const vectors2 = new Vector2NacaFoil(this.settings.chord, this.settings.compareNacaCode, resolution);
 
     const foil = this.getFoilMesh(vectors, depth);
+    const foil2 = this.getFoilMesh(vectors2, depth);
 
     foil.name = "foil"; // Assign a unique name
+    foil2.name = "foil"; // Assign a unique name
 
     scene.add(foil);
+    /*
+    if (localStorage.getItem("compareNacaCode") && this.settings.compareNacaCode !== this.settings.nacaCode) {
+      scene.add(foil2);
+    }
+    */
+
+    foil2.position.z = 10;
 
     const skyColor = 0xB1E1FF; // light blue
     const groundColor = 0xB97A20; // brownish orange
@@ -220,7 +252,7 @@ export class Scene {
     });
 
     // Create particles to flow over and under the foil
-    const particleCount = 1800;
+    const particleCount = this.settings.particleCount; // Reduced particle count
     const particleGeometry = new THREE.BufferGeometry();
     const particlePositions = new Float32Array(particleCount * 3);
 
@@ -352,8 +384,8 @@ export class Scene {
     const tiltShiftPass = new ShaderPass({
       uniforms: {
       tDiffuse: { value: null },
-      focus: { value: Math.max(0.6, 0.5 + (this.settings.particleSpeed - 2.1) * 0.05) }, // Reduced focus adjustment
-      maxblur: { value: Math.min(0.5, 0.01 + (this.settings.particleSpeed) * 0.01) }, // Reduced maxblur for less blur
+      focus: { value: Math.max(0.04, 0.5 + (this.settings.particleSpeed - 2.1) * 0.03) }, // Slightly sharper focus
+      maxblur: { value: Math.min(0.1, 0.005 + (this.settings.particleSpeed) * 0.005) }, // Reduced maxblur for less blur
       aspect: { value: window.innerWidth / window.innerHeight },
       },
       vertexShader: `
@@ -375,9 +407,9 @@ export class Scene {
       float h = focus - vUv.y;
       float blur = maxblur * abs(h);
       vec2 offset = vec2(blur / aspect, blur);
-      color += texture2D(tDiffuse, vUv + offset) * 0.3; // Adjusted weights for a lighter effect
-      color += texture2D(tDiffuse, vUv - offset) * 0.3; // Adjusted weights for a lighter effect
-      color += texture2D(tDiffuse, vUv) * 0.4; // Adjusted weights for a lighter effect
+      color += texture2D(tDiffuse, vUv + offset) * 0.4; // Adjusted weights for a sharper effect
+      color += texture2D(tDiffuse, vUv - offset) * 0.4; // Adjusted weights for a sharper effect
+      color += texture2D(tDiffuse, vUv) * 0.2; // Adjusted weights for a sharper effect
       gl_FragColor = color;
       }
       `,
@@ -416,7 +448,29 @@ export class Scene {
       return [foil.rotation.z, foil.position.y];
     };
 
-    
+    const adjustFoilRotation = () => {
+      const boundingBox = new THREE.Box3().setFromObject(foil);
+      const initialWidth = boundingBox.max.x - boundingBox.min.x;
+
+      let maxWidth = initialWidth;
+      let optimalRotation = foil.rotation.z;
+
+      for (let angle = 0; angle <= Math.PI * 2; angle += 0.01) {
+      foil.rotation.z = angle;
+      const testBoundingBox = new THREE.Box3().setFromObject(foil);
+      const testWidth = testBoundingBox.max.x - testBoundingBox.min.x;
+
+      if (testWidth > maxWidth) {
+        maxWidth = testWidth;
+        optimalRotation = angle;
+      }
+      }
+
+      foil.rotation.z = optimalRotation;
+      console.log(`Optimal rotation for maximum projection on X-axis: ${optimalRotation}`);
+    };
+
+    adjustFoilRotation();
 
     let nuTilde = 0;
     const animate = () => {
@@ -475,10 +529,6 @@ export class Scene {
         const maxDistance = sphere.radius * (40 / this.settings.particleSpeed);
         let intensity = 1 - Math.min(distance / maxDistance, 1);
         const iscalar = foil.rotation.z > 0.01 ? intensity : 1 - intensity;
-
-        // Adjust intensity based on the foil's vertical position
-        const positionFactor = Math.abs(foil.position.y) / 10; // Normalize foil position.y
-        intensity = intensity * (1 - positionFactor);
 
         if (distance <= sphere.radius * ((this.settings.airFriction*10)^2)) {
         // Calculate impulse based on collision normal
@@ -622,6 +672,11 @@ export class Scene {
       steps: 1,
       bevelEnabled: true,
     });
+
+    // const wireframe = new THREE.WireframeGeometry(geometry);
+    // const lineMaterial = new THREE.LineBasicMaterial({ color: 0x00ff00 });
+    // const line = new THREE.LineSegments(wireframe, lineMaterial);
+    // this.scene.add(line);
 
     const material = new THREE.MeshStandardMaterial({
       color: 0xffffff,

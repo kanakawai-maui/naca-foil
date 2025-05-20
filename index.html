@@ -15,17 +15,34 @@
     <title>Development</title>
     <style>
       body {
-        margin: 0;
+      margin: 0;
       }
       .container {
-        height: 100vh;
-        display: flex;
-        justify-content: center;
-        align-items: center;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
       }
-    </style>
+        </style>
+        <meta
+      name="description"
+      content="NACA 4- and 5-digit airfoils are mathematical representations of airfoil shapes developed by the National Advisory Committee for Aeronautics (NACA). They are widely used in aerodynamics for designing wings and blades."
+        />
   </head>
   <body>
+    <header style="padding: 10px; font-family: Arial, sans-serif; line-height: 1.4; background-color: #000000; color: white; text-align: center;">
+      <h1 style="margin: 0; font-size: 1.8rem;">ʻŌlelo NACA Airfoil Simulator</h1>
+      <div style="display: flex; padding: 10px; box-sizing: border-box;">
+        <div style="flex: 1; margin: 5px 0; font-size: 0.9rem;">
+          <p>
+            NACA airfoils are mathematical representations of airfoil shapes developed by the National Advisory Committee for Aeronautics (NACA). These airfoils are widely used in aerodynamics for designing wings, blades, and other aerodynamic surfaces.
+          </p>
+          <p>
+            You can learn more about airfoils <a href="http://airfoiltools.com/search/index" target="_blank" style="color: rgb(102, 102, 248);">here</a>!
+         </p>
+        </div>
+      </div>
+    </header>
     <div style="display: flex; flex-direction: column">
       <div style="margin: 0">
         <div id="naca-foil"></div>
