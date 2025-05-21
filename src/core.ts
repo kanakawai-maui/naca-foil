@@ -2,21 +2,23 @@
 export class NacaFoilMath {
 
     /**
-      * Calculates the Y-coordinate of a NACA airfoil at a given X-coordinate.
-      *
-      * @param x - The X-coordinate along the chord line of the airfoil.
-      * @param c - The chord length of the airfoil (distance from leading edge to trailing edge).
-      * @param t - The maximum thickness of the airfoil as a fraction of the chord length.
-      * @param closeAirfoils - A boolean indicating whether to use the closed trailing edge formula (default: true).
-      *                        If true, the trailing edge will be closed; otherwise, it will be slightly open.
-      * @returns The Y-coordinate of the airfoil at the given X-coordinate.
-      *
-      * @remarks
-      * - The chord (`c`) is the straight-line distance from the leading edge to the trailing edge of the airfoil.
-      * - The camber is not directly calculated in this function but is influenced by the thickness distribution (`t`).
-      * - This implementation supports both 4-digit and 5-digit NACA airfoils. For 5-digit airfoils, the camber line
-      *   equations are adjusted to account for the more complex camber line used in these airfoils.
-      */
+     * Calculates the Y-coordinate of a NACA airfoil at a given X-coordinate.
+     *
+     * @param x - The X-coordinate along the chord line of the airfoil.
+     * @param c - The chord length of the airfoil (distance from leading edge to trailing edge).
+     * @param t - The maximum thickness of the airfoil as a fraction of the chord length.
+     * @param closeAirfoils - A boolean indicating whether to use the closed trailing edge formula (default: true).
+     *                        If true, the trailing edge will be closed; otherwise, it will be slightly open.
+     * @param isFiveDigit - A boolean indicating whether the airfoil is a 5-digit NACA airfoil (default: false).
+     *                      If true, the 5-digit airfoil thickness distribution is used.
+     * @returns The Y-coordinate of the airfoil at the given X-coordinate.
+     *
+     * @remarks
+     * - The chord (`c`) is the straight-line distance from the leading edge to the trailing edge of the airfoil.
+     * - The camber is not directly calculated in this function but is influenced by the thickness distribution (`t`).
+     * - This implementation supports both 4-digit and 5-digit NACA airfoils. For 5-digit airfoils, the thickness
+     *   distribution is adjusted to account for the more complex camber line used in these airfoils.
+     */
     static foilY(x: number, c: number, t: number, closeAirfoils = true, isFiveDigit = false) {
       const thicknessTerm = isFiveDigit
         ? 0.2969 * Math.sqrt(x / c) -
@@ -62,12 +64,13 @@ export class NacaFoilMath {
         m: number,
         p: number,
         upper = true,
+        isFiveDigit = false,
     ) {
         return upper
         ? NacaFoilMath.camber(x, c, m, p) +
-            NacaFoilMath.foilY(x, c, t) * Math.cos(NacaFoilMath.theta(x, c, m, p))
+            NacaFoilMath.foilY(x, c, t, true, isFiveDigit) * Math.cos(NacaFoilMath.theta(x, c, m, p))
         : NacaFoilMath.camber(x, c, m, p) -
-            NacaFoilMath.foilY(x, c, t) *
+            NacaFoilMath.foilY(x, c, t, true, isFiveDigit) *
                 Math.cos(NacaFoilMath.theta(x, c, m, p));
     }
 
@@ -102,7 +105,7 @@ export class NacaFoil {
   _constructor(
     chord: number = 10,
     naca_code: string = "0015",
-    resolution: number = 100,
+    resolution: number = 10,
     
     ) {
     let naca = parseInt(naca_code);
@@ -115,6 +118,7 @@ export class NacaFoil {
     let m = 0;
     let p = 0;
     let res = resolution;
+    let isFiveDigit = false;
 
     if (naca_code.length === 4) {
       // 4-digit NACA airfoil
@@ -122,6 +126,7 @@ export class NacaFoil {
       p = (((naca - (naca % 100)) / 100) % 10) / 10;
     } else if (naca_code.length === 5) {
       // 5-digit NACA airfoil
+      isFiveDigit = true;
       const firstDigit = Math.floor(naca / 10000);
       const secondTwoDigits = Math.floor((naca % 10000) / 100);
       const lastTwoDigits = naca % 100;
@@ -138,7 +143,7 @@ export class NacaFoil {
     for (let i = c; i >= 0; i -= res) {
       this.upper.push([
       NacaFoilMath.camberX(i + shift, c, t, m, p),
-      NacaFoilMath.camberY(i, c, t, m, p),
+      NacaFoilMath.camberY(i, c, t, m, p, true, isFiveDigit),
       ]);
     }
 
@@ -146,7 +151,7 @@ export class NacaFoil {
     for (let i = 0; i <= c; i += res) {
       this.lower.push([
       NacaFoilMath.camberX(i + shift, c, t, m, p, false),
-      NacaFoilMath.camberY(i, c, t, m, p, false),
+      NacaFoilMath.camberY(i, c, t, m, p, false, isFiveDigit),
       ]);
     }
 

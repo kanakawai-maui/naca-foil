@@ -8,6 +8,8 @@ export declare class Scene {
         nacaCode: string;
         compareNacaCode: string;
         chord: number;
+        particleSize: number;
+        showWireframe: boolean;
         particleSpeed: number;
         airFriction: number;
         particleCount: number;

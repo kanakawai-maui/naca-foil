@@ -22,6 +22,8 @@ export class Scene {
     nacaCode: string;
     compareNacaCode: string;
     chord: number;
+    particleSize: number;
+    showWireframe: boolean;
     particleSpeed: number;
     airFriction: number;
     particleCount: number;
@@ -55,22 +57,24 @@ export class Scene {
    */
   constructor(id: string = "naca-foil") {
     // Load the saved NACA code from localStorage if available
-    const savedNacaCode = localStorage.getItem("nacaCode") || '0015';
+    const savedNacaCode = localStorage.getItem("nacaCode") || '2412';
     console.log("Saved NACA code:", savedNacaCode);
     const savedCompareNacaCode = localStorage.getItem("compareNacaCode") || '0015';
     console.log("Compare NACA code:", savedCompareNacaCode);
-    const savedChord = localStorage.getItem("chord") || '10';
+    const savedChord = localStorage.getItem("chord") || '5';
     console.log("Saved chord:", savedChord);
     const savedAirFriction = localStorage.getItem("airFriction") || '0.6';
     console.log("Saved air friction:", savedAirFriction);
-    const savedParticleCount = localStorage.getItem("particleCount") || '2800';
+    const savedParticleCount = localStorage.getItem("particleCount") || '1800';
     console.log("Saved particle count:", savedParticleCount);
     this.settings = {
       nacaCode: savedNacaCode || "2412",
       compareNacaCode: savedCompareNacaCode || "23012",
-      chord: parseInt(savedChord) || 10,
-      particleSpeed: 2.1,
-      particleCount: parseInt(savedParticleCount) || 2800,
+      chord: parseInt(savedChord) || 5,
+      showWireframe: false,
+      particleSize: 3,
+      particleSpeed: 5.5,
+      particleCount: parseInt(savedParticleCount) || 1800,
       airFriction: parseFloat(savedAirFriction) || 0.6,
       reset: () => {
         localStorage.removeItem("nacaCode");
@@ -108,12 +112,6 @@ export class Scene {
         const isValidNacaCode = /^[0-9]{4,5}$/.test(newValue);
         if (isValidNacaCode) {
           localStorage.setItem("nacaCode", newValue); // Save the new value to localStorage
-          if (newValue.length === 5) {
-            console.log(`Reducing particle count`);
-            localStorage.setItem("particleCount",  Math.min(this.settings.particleCount, Math.floor(1800 * 0.5)).toString()); // Save the new value to localStorage
-          } else {
-            localStorage.setItem("particleCount", "1800");
-          }
           location.reload();
         }
       });
@@ -121,10 +119,33 @@ export class Scene {
         localStorage.setItem("chord", newValue.toString()); // Save the new value to localStorage
         location.reload(); // Refresh the page
       });
+      gui.add(this.settings, "particleCount", 1000, 12800, 100).name("Particle Count").onChange((newValue: number) => {
+        localStorage.setItem("particleCount", newValue.toString()); // Save the new value to localStorage
+        location.reload(); // Refresh the page
+      });
       gui.add(this.settings, "particleSpeed", 0.15, 10, 0.1).name("Particle Speed");
       gui.add(this.settings, "airFriction", 0, 1, 0.01).name("Air Friction").onChange((newValue: number) => {
         localStorage.setItem("airFriction", newValue.toString()); // Save the new value to localStorage
         location.reload(); // Refresh the page
+      });
+      gui.add(this.settings, "showWireframe").name("Wireframe Only").onChange((newValue: boolean) => {
+        this.scene.traverse((object) => {
+          if (object instanceof THREE.Mesh) {
+            if (object.material instanceof THREE.MeshStandardMaterial) {
+              object.material.wireframe = newValue;
+              object.material.emissive = newValue ? new THREE.Color(0x00FF00) : new THREE.Color(0x000000) ; // Set emissive color to green
+              object.material.needsUpdate = true;
+            }
+          }
+        });
+      });
+      gui.add(this.settings, "particleSize", 0.1, 10, 0.1).name("Particle Size").onChange((newValue: number) => {
+        const particlesObject = this.scene.getObjectByName("particles");
+        const particleMaterial = particlesObject instanceof THREE.Points ? particlesObject.material as THREE.PointsMaterial : null;
+        if (particleMaterial) {
+          particleMaterial.size = newValue;
+          particleMaterial.needsUpdate = true;
+        }
       });
       gui.add({ info: "←→ Use Arrow Keys" }, "info")
       .name("Angle of Attack")
@@ -256,23 +277,12 @@ export class Scene {
     const particleGeometry = new THREE.BufferGeometry();
     const particlePositions = new Float32Array(particleCount * 3);
 
-    const fieldScalar = 4; // 2 or 4 are better values
-
     // Set air friction (linear and angular damping) globally for all particles
     // Set linear and angular damping based on air friction
     const linearDamping = Math.max(0, 1 - this.settings.airFriction * 1.5); // Increased linear damping for stronger air resistance
     const angularDamping = Math.max(0, 1 - this.settings.airFriction * 1.5); // Increased angular damping for stronger air resistance
 
     console.log("Enhanced Linear Damping:", linearDamping, "Enhanced Angular Damping:", angularDamping); // Log enhanced damping values for debugging
-
-    for (let i = 0; i < particleCount; i++) {
-      const theta = Math.random() * Math.PI * 2; // Random angle in radians
-      const radius = Math.random() * 20; // Random radius within the cylinder
-      const x = Math.random() * 200; // X coordinate in of length of cylinder
-      const y = Math.random() * 20; // Spread particles along the radius of the cylinder
-      const z = radius * Math.sin(theta); // Z coordinate in cylindrical coordinates
-      particlePositions.set([x, y, z], i * 3);
-    }
 
     particleGeometry.setAttribute(
       "position",
@@ -311,6 +321,7 @@ export class Scene {
     particleMaterial.needsUpdate = true;
 
     const particles = new THREE.Points(particleGeometry, particleMaterial);
+    particles.name = "particles"; // Assign a unique name
     scene.add(particles);
 
     const particleBodies: RAPIER.RigidBody[] = [];
@@ -334,6 +345,17 @@ export class Scene {
       rigidBody.setAngularDamping(angularDamping); // Set angular damping for air resistance
 
       particleBodies.push(rigidBody);
+    }
+
+    for (let i = 0; i < particleCount; i++) {
+      const rigidBody = particleBodies[i];
+      const newX = Math.random() * 400; // Reset to a random position between -100 and -80
+      const theta = Math.random() * Math.PI * 2; // Random angle in radians
+      const phi = Math.random() * Math.PI * 2; // Random angle in radians
+      const radius = 20; // Radius for spherical coordinates
+      const newY = radius * Math.sin(phi) * Math.sin(theta); // Y coordinate
+      const newZ = radius * Math.cos(phi); // Z coordinate
+      rigidBody.setTranslation({ x: newX, y: newY, z: newZ }, true);
     }
 
     // Create a group of overlapping bounding spheres representing the foil
@@ -386,15 +408,15 @@ export class Scene {
     const tiltShiftPass = new ShaderPass({
       uniforms: {
       tDiffuse: { value: null },
-      focus: { value: Math.max(0.04, 0.5 + (this.settings.particleSpeed - 2.1) * 0.03) }, // Slightly sharper focus
-      maxblur: { value: Math.min(0.1, 0.005 + (this.settings.particleSpeed) * 0.005) }, // Reduced maxblur for less blur
+      focus: { value: 0.5 }, // Adjusted focus to center the effect
+      maxblur: { value: 0.02 }, // Reduced maxblur for a more subtle effect
       aspect: { value: window.innerWidth / window.innerHeight },
       },
       vertexShader: `
       varying vec2 vUv;
       void main() {
-      vUv = uv;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
       }
       `,
       fragmentShader: `
@@ -405,14 +427,14 @@ export class Scene {
       varying vec2 vUv;
 
       void main() {
-      vec4 color = vec4(0.0);
-      float h = focus - vUv.y;
-      float blur = maxblur * abs(h);
-      vec2 offset = vec2(blur / aspect, blur);
-      color += texture2D(tDiffuse, vUv + offset) * 0.4; // Adjusted weights for a sharper effect
-      color += texture2D(tDiffuse, vUv - offset) * 0.4; // Adjusted weights for a sharper effect
-      color += texture2D(tDiffuse, vUv) * 0.2; // Adjusted weights for a sharper effect
-      gl_FragColor = color;
+        vec4 color = vec4(0.0);
+        float h = focus - vUv.y;
+        float blur = maxblur * abs(h);
+        vec2 offset = vec2(blur / aspect, blur);
+        color += texture2D(tDiffuse, vUv + offset) * 0.33; // Balanced weights
+        color += texture2D(tDiffuse, vUv - offset) * 0.33; // Balanced weights
+        color += texture2D(tDiffuse, vUv) * 0.34; // Balanced weights
+        gl_FragColor = color;
       }
       `,
     });
@@ -477,7 +499,6 @@ export class Scene {
     let nuTilde = 0;
     const animate = () => {
       requestAnimationFrame(animate);
-
       const delta = this.clock.getDelta();
 
       const positions = particleGeometry.attributes.position.array;
