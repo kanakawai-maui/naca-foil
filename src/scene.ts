@@ -279,8 +279,8 @@ export class Scene {
 
     // Set air friction (linear and angular damping) globally for all particles
     // Set linear and angular damping based on air friction
-    const linearDamping = Math.max(0, 1 - this.settings.airFriction * 1.5); // Increased linear damping for stronger air resistance
-    const angularDamping = Math.max(0, 1 - this.settings.airFriction * 1.5); // Increased angular damping for stronger air resistance
+    const linearDamping = Math.max(0, 1 - this.settings.airFriction * 2.5); // Increased linear damping for stronger air resistance
+    const angularDamping = Math.max(0, 1 - this.settings.airFriction * 2.0); // Increased angular damping for stronger air resistance
 
     console.log("Enhanced Linear Damping:", linearDamping, "Enhanced Angular Damping:", angularDamping); // Log enhanced damping values for debugging
 
@@ -551,7 +551,7 @@ export class Scene {
         );
         const distance = sphereCenter.distanceTo(particlePosition);
 
-        if (distance <= (sphere.radius * 1) * ((this.settings.airFriction*10)^2)) {
+        if (distance <= (sphere.radius * 1) * ((this.settings.airFriction*20)^2)) {
         // Calculate impulse based on collision normal
 
         const offset = new THREE.Vector3(0, sphere.radius, 0);
@@ -559,7 +559,7 @@ export class Scene {
         const yimpulse = new THREE.Vector3(0, 0, 0);
 
         // Apply Spalart-Allmaras turbulence model
-        nuTilde = Math.max(0, this.settings.airFriction * 0.1); // Turbulent viscosity-like term
+        nuTilde = Math.max(0, this.settings.airFriction * 0.2); // Turbulent viscosity-like term
         const distanceToFoil = Math.max(0.001, distance); // Avoid division by zero
         const viscosity = 0.0000181; // Dynamic viscosity of air (kg/m·s)
         const density = 1.225; // Air density (kg/m³)
