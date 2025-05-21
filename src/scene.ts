@@ -349,7 +349,7 @@ export class Scene {
 
     for (let i = 0; i < particleCount; i++) {
       const rigidBody = particleBodies[i];
-      const newX = Math.random() * 400; // Reset to a random position between -100 and -80
+      const newX = Math.random() * 200 - 100; // Reset to a random position between -100 and 100
       const theta = Math.random() * Math.PI * 2; // Random angle in radians
       const phi = Math.random() * Math.PI * 2; // Random angle in radians
       const radius = 20; // Radius for spherical coordinates
@@ -551,12 +551,7 @@ export class Scene {
         );
         const distance = sphereCenter.distanceTo(particlePosition);
 
-        // Update particle color based on proximity, foil rotation, and foil position.y
-        const maxDistance = sphere.radius * (40 / this.settings.particleSpeed);
-        let intensity = 1 - Math.min(distance / maxDistance, 1);
-        const iscalar = foil.rotation.z > 0.01 ? intensity : 1 - intensity;
-
-        if (distance <= sphere.radius * ((this.settings.airFriction*10)^2)) {
+        if (distance <= (sphere.radius * 1) * ((this.settings.airFriction*10)^2)) {
         // Calculate impulse based on collision normal
 
         const offset = new THREE.Vector3(0, sphere.radius, 0);
@@ -652,23 +647,20 @@ export class Scene {
           true
         );
 
-        // Add swirling effect near the sphere
-        const swirlRadius = sphere.radius * (6 / this.settings.particleSpeed);
-        const toCenter = particlePosition.clone().sub(sphereCenter);
-        if (toCenter.length() <= swirlRadius) {
-          const swirlVector = new THREE.Vector3(-toCenter.z, 0, toCenter.x).normalize();
-          const swirlEffect = swirlVector.multiplyScalar(
-          0.9 * (1 - toCenter.length() / swirlRadius)
-          );
-          rigidBody.applyImpulse(
-          { x: swirlEffect.x, y: swirlEffect.y, z: swirlEffect.z },
-          true
-          );
-        }
+        const velocityMagnitude = Math.sqrt(
+          rigidBody.linvel().x ** 2 +
+          rigidBody.linvel().y ** 2 +
+          rigidBody.linvel().z ** 2
+        );
+        const centerlineDistance = Math.abs(rigidBody.translation().y - foil.position.y);
+        const centerlineFactor = Math.max(0, 1 - centerlineDistance / (sphere.radius));
+        const velocityFactor = Math.min(1, velocityMagnitude / 1000); // Scale velocity factor
 
-        colors[index] = Math.min(1.0 * iscalar, 1);
-        colors[index + 1] = 0.01;
-        colors[index + 2] = Math.min(1.0 * intensity, 1);
+        let iscalar = (centerlineFactor + velocityFactor) / 2; // Combine factors
+
+        colors[index] = Math.min(1.0 * iscalar, 1); // Red increases with iscalar
+        colors[index + 1] = 0.01; // Green remains constant
+        colors[index + 2] = Math.min(1.0 * (1 - iscalar), 1); // Blue decreases with iscalar
         }
       }
 
