@@ -7,7 +7,7 @@ export class Vector2NacaFoil extends NacaFoil {
   constructor(
     chord: number = 10,
     naca_code: string = "0015",
-    resolution: number = 1
+    resolution: number = 10
   ) {
     super();
     this._constructor(chord, naca_code, resolution);

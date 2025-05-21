@@ -173,7 +173,7 @@ export class Scene {
     }
     */
 
-    foil2.position.z = 10;
+    foil2.position.z = 5;
 
     const skyColor = 0xB1E1FF; // light blue
     const groundColor = 0xB97A20; // brownish orange
@@ -266,9 +266,11 @@ export class Scene {
     console.log("Enhanced Linear Damping:", linearDamping, "Enhanced Angular Damping:", angularDamping); // Log enhanced damping values for debugging
 
     for (let i = 0; i < particleCount; i++) {
-      const x = Math.random() * this.settings.chord*6 * fieldScalar - this.settings.chord*6; // Spread particles within a cube along the x-axis
-      const y = Math.random() * depth * fieldScalar - depth; // Spread particles within a cube along the y-axis
-      const z = Math.random() * this.settings.chord * fieldScalar - this.settings.chord; // Spread particles within a cube along the z-axis
+      const theta = Math.random() * Math.PI * 2; // Random angle in radians
+      const radius = Math.random() * 20; // Random radius within the cylinder
+      const x = Math.random() * 200; // X coordinate in of length of cylinder
+      const y = Math.random() * 20; // Spread particles along the radius of the cylinder
+      const z = radius * Math.sin(theta); // Z coordinate in cylindrical coordinates
       particlePositions.set([x, y, z], i * 3);
     }
 
@@ -498,17 +500,20 @@ export class Scene {
       // Move particles from right to left (positive x direction)
       let newX = translation.x + this.settings.particleSpeed;
 
-      // Wrap particles around to keep them within bounds
-      if (newX > this.settings.chord + 100) {
-        newX = Math.random() * this.settings.chord / 2 * fieldScalar - this.settings.chord / 2 + (-100);
-        const newY = Math.random() * depth * fieldScalar - depth + (-10);
-        const newZ = Math.random() * this.settings.chord / 2 * 2 * fieldScalar - this.settings.chord / 2 + (-10);
+      // Wrap particles around to keep them originating from the front of the tunnel
+      if (newX > 100) {
+        newX = Math.random() * 20 - 100; // Reset to a random position between -100 and -80
+        const theta = Math.random() * Math.PI * 2; // Random angle in radians
+        const phi = Math.random() * Math.PI; // Random angle in radians
+        const radius = 20; // Radius for spherical coordinates
+        const newY = radius * Math.sin(phi) * Math.sin(theta); // Y coordinate
+        const newZ = radius * Math.cos(phi); // Z coordinate
         rigidBody.setTranslation({ x: newX, y: newY, z: newZ }, true);
         colors[index] = 0.001; // Red
         colors[index + 1] = 0.005; // Green
         colors[index + 2] = 0.1; // Blue
       } else {
-        rigidBody.setTranslation({ x: newX, y: translation.y, z: translation.z }, true);
+       rigidBody.setTranslation({ x: newX, y: translation.y, z: translation.z }, true);
       }
 
       // Check for collisions with bounding spheres

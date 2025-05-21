@@ -102,7 +102,7 @@ export class NacaFoil {
   _constructor(
     chord: number = 10,
     naca_code: string = "0015",
-    resolution: number = 10,
+    resolution: number = 100,
     
     ) {
     let naca = parseInt(naca_code);
