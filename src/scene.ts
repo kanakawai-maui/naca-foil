@@ -62,36 +62,36 @@ export class Scene {
     // Load the saved NACA code from localStorage if available
     const savedNacaCode = localStorage.getItem("nacaCode") || '2412';
     console.log("Saved NACA code:", savedNacaCode);
-    const savedCompareNacaCode = localStorage.getItem("compareNacaCode") || '23012';
+    const savedCompareNacaCode = localStorage.getItem("compareNacaCode") || '';
     console.log("Compare NACA code:", savedCompareNacaCode);
-    const savedAirFriction = localStorage.getItem("airFriction") || '0.61';
+    const savedAirFriction = localStorage.getItem("airFriction") || '0.01';
     console.log("Saved air friction:", savedAirFriction);
-    const savedParticleCount = localStorage.getItem("particleCount") || '6600';
+    const savedParticleCount = localStorage.getItem("particleCount") || '5000';
     console.log("Saved particle count:", savedParticleCount);
     // Load the saved particle size from localStorage if available
-    const savedParticleSize = localStorage.getItem("particleSize") || '8.9';
+    const savedParticleSize = localStorage.getItem("particleSize") || '14.6';
     console.log("Saved particle size:", savedParticleSize);
     // Load the saved particle speed from localStorage if available
-    const savedParticleSpeed = localStorage.getItem("particleSpeed") || '6.95';
+    const savedParticleSpeed = localStorage.getItem("particleSpeed") || '2.75';
     console.log("Saved particle speed:", savedParticleSpeed);
     const savedParticleOpacity = localStorage.getItem("particleOpacity") || '0.5';
     console.log("Saved particle opacity:", savedParticleOpacity);
-    const savedDistanceFactor = localStorage.getItem("distanceF") || '1.1';
+    const savedDistanceFactor = localStorage.getItem("distanceF") || '1.0';
     console.log("Saved distance factor:", savedDistanceFactor);
-    const savedVelocityFactor = localStorage.getItem("velocityF") || '2';
+    const savedVelocityFactor = localStorage.getItem("velocityF") || '6.0';
     console.log("Saved velocity factor:", savedVelocityFactor);
     this.settings = {
       nacaCode: savedNacaCode || "2412",
-      compareNacaCode: savedCompareNacaCode || "23012",
+      compareNacaCode: savedCompareNacaCode || "",
       showWireframe: false,
       chord: 8,
-      particleSize: parseFloat(savedParticleSize) || 8.9,
+      particleSize: parseFloat(savedParticleSize) || 14.6,
       particleOpacity: parseFloat(savedParticleOpacity) || 0.5,
-      particleSpeed: parseFloat(savedParticleSpeed) || 6.95,
-      particleCount: parseInt(savedParticleCount) || 6600,
-      airFriction: parseFloat(savedAirFriction) || 0.61,
-      distanceF:  parseFloat(savedDistanceFactor) || 1.1,
-      velocityF:  parseFloat(savedVelocityFactor) || 2.0,
+      particleSpeed: parseFloat(savedParticleSpeed) || 2.75,
+      particleCount: parseInt(savedParticleCount) || 5000,
+      airFriction: parseFloat(savedAirFriction) || 0.01,
+      distanceF:  parseFloat(savedDistanceFactor) || 1.0,
+      velocityF:  parseFloat(savedVelocityFactor) || 6.0,
       reset: () => {
         localStorage.removeItem("nacaCode");
         localStorage.removeItem("airFriction");
@@ -181,11 +181,9 @@ export class Scene {
       });
       gui.add(this.settings, "distanceF", 0.1, 5, 0.1).name("Distance Factor").onChange((newValue: number) => {
         localStorage.setItem("distanceF", newValue.toString());
-        location.reload(); // Refresh the page
       });
       gui.add(this.settings, "velocityF", 0.1, 10, 0.1).name("Velocity Factor").onChange((newValue: number) => {
         localStorage.setItem("velocityF", newValue.toString());
-        location.reload(); // Refresh the page
       });
       gui.add({ info: "←→ Use Arrow Keys" }, "info")
       .name("Angle of Attack")
@@ -193,15 +191,30 @@ export class Scene {
       gui.add({ info: "↑↓ Use Arrow Keys" }, "info")
       .name("Altitude")
       .disable();
-      /*gui.add(this.settings, "compareNacaCode").name("Compare Last").onChange((newValue: string) => {
-        localStorage.setItem("compareNacaCode", newValue); // Save the NACA code if checked, otherwise clear
-        location.reload(); // Refresh the page
-      }).listen();*/
+      // gui.add(this.settings, "compareNacaCode").name("Compare Last").onChange((newValue: string) => {
+      //   if(newValue === "") {
+      //     localStorage.removeItem("compareNacaCode");
+      //     location.reload();
+      //   }
+      //   const isValidNacaCode = /^[0-9]{4,5}$/.test(newValue);
+      //   if (isValidNacaCode) {
+      //     localStorage.setItem("compareNacaCode", newValue); // Save the new value to localStorage
+      //     location.reload();
+      //   }
+      // });
 
       gui.add(this.settings, "reset").name("Reset").onChange(() => {
         localStorage.removeItem("nacaCode");
         localStorage.removeItem("chord");
         localStorage.removeItem("airFriction");
+        localStorage.removeItem("particleCount");
+        localStorage.removeItem("particleSize");
+        localStorage.removeItem("particleSpeed");
+        localStorage.removeItem("particleOpacity");
+        localStorage.removeItem("showWireframe");
+        localStorage.removeItem("compareNacaCode");
+        localStorage.removeItem("distanceF");
+        localStorage.removeItem("velocityF");
         location.reload(); // Refresh the page
       });
   }
@@ -214,27 +227,28 @@ export class Scene {
 
     const resolution = 0.04;
 
-    const depth = 10;
+    const foils = [];
 
-    console.log("NACA code:", this.settings.nacaCode);
+    let depth = 10;
 
     const vectors = new Vector2NacaFoil(this.settings.chord, this.settings.nacaCode, resolution);
-    const vectors2 = new Vector2NacaFoil(this.settings.chord, this.settings.compareNacaCode, resolution);
 
     const foil = this.getFoilMesh(vectors, depth);
-    const foil2 = this.getFoilMesh(vectors2, depth);
 
     foil.name = "foil"; // Assign a unique name
-    foil2.name = "foil"; // Assign a unique name
-
+    
     scene.add(foil);
-    /*
-    if (localStorage.getItem("compareNacaCode") && this.settings.compareNacaCode !== this.settings.nacaCode) {
-      scene.add(foil2);
-    }
-    */
+    foils.push(foil);
 
-    foil2.position.z = 5;
+    // if(this.settings.compareNacaCode !== "") {
+    //   depth = 5;
+    //   const vectorsAlt = new Vector2NacaFoil(this.settings.chord, this.settings.compareNacaCode, resolution);
+    //   const foilAlt = this.getFoilMesh(vectorsAlt, depth);
+    //   foilAlt.name = "foil"; // Assign a unique name
+    //   scene.add(foilAlt);
+    //   foilAlt.position.z = 5;
+    //   foils.push(foilAlt);
+    // }
 
     const skyColor = 0xB1E1FF; // light blue
     const groundColor = 0xB97A20; // brownish orange
@@ -404,15 +418,14 @@ export class Scene {
     const boundingSphereGroup = new THREE.Group();
     
 
-    for (let i = 0; i < foilVertices.length; i += 1) {
+    for (let i = 0; i < foilVertices.length; i += 10) {
       for (let z = -depth/2; z <= depth/2; z += depth / 20) {
-      const vertex = new THREE.Vector3(
-        foilVertices[i].x,
-        0,
-        z+depth/2
-      );
-
-      const radii = Math.abs((foilVertices[i].y)); // Use 1/2 the difference between upper and lower edges as the radius
+        const radii = Math.abs((foilVertices[i].y)); // Use 1/2 the difference between upper and lower edges as the radius
+        const vertex = new THREE.Vector3(
+          foilVertices[i].x + radii,
+          0,
+          z+depth
+        );
 
       const sphere = new THREE.Sphere(vertex, radii); // Use 1/2 the absolute value of y as the radius
       boundingSpheres.push(sphere);
@@ -568,6 +581,35 @@ export class Scene {
       // Move particles from right to left (positive x direction)
       let newX = translation.x + this.settings.particleSpeed;
 
+      // Check for collisions with the tunnel walls
+      const distanceFromCenter = Math.sqrt(translation.y ** 2 + translation.z ** 2);
+      if (distanceFromCenter >= tunnelRadius) {
+        // Reflect the particle back into the tunnel
+        const collisionNormal = new THREE.Vector3(0, translation.y, translation.z).normalize();
+        const velocity = new THREE.Vector3(
+          rigidBody.linvel().x,
+          rigidBody.linvel().y,
+          rigidBody.linvel().z
+        );
+
+        // Retain the x velocity while reflecting the y and z components
+        const reflectedVelocity = new THREE.Vector3(
+          velocity.x, // Retain x velocity
+          velocity.y - 2 * velocity.dot(collisionNormal) * collisionNormal.y,
+          velocity.z - 2 * velocity.dot(collisionNormal) * collisionNormal.z
+        );
+        rigidBody.setLinvel({ x: reflectedVelocity.x, y: reflectedVelocity.y, z: reflectedVelocity.z }, true);
+
+        // Adjust position to ensure the particle is inside the tunnel
+        const penetrationDepth = distanceFromCenter - tunnelRadius;
+        const correction = collisionNormal.multiplyScalar(penetrationDepth);
+        rigidBody.setTranslation(
+          { x: translation.x, y: translation.y - correction.y, z: translation.z - correction.z },
+          true
+        );
+      }
+      
+
       // Wrap particles around to keep them originating from the front of the tunnel
       if (newX > 100) {
         newX = Math.random() * 20 - 100; // Reset to a random position between -100 and -80
@@ -576,6 +618,7 @@ export class Scene {
         const radius = 20; // Radius for spherical coordinates
         const newY = radius * Math.sin(phi) * Math.sin(theta); // Y coordinate
         const newZ = radius * Math.cos(phi); // Z coordinate
+
         rigidBody.setTranslation({ x: newX, y: newY, z: newZ }, true);
         colors[index] = 0.01; // Red
         colors[index + 1] = 0.01; // Green
@@ -583,6 +626,11 @@ export class Scene {
       } else {
         rigidBody.setTranslation({ x: newX, y: translation.y, z: translation.z }, true);
       }
+
+
+        
+
+      
 
       // Check for collisions with bounding spheres
       for (let j = 0; j < boundingSpheres.length; j++) {
@@ -596,11 +644,11 @@ export class Scene {
         );
 
         // Factor in boundary layer dynamics
-        const boundaryLayerThickness = Math.max(2, sphereRadius * 2); // Approximate boundary layer thickness
+        const boundaryLayerThickness = Math.max(2, sphereRadius * 0.1); // Approximate boundary layer thickness
         const distanceToParticle = sphereCenter.distanceTo(particlePosition);
         
 
-        if (distanceToParticle <= 20) {
+        if (distanceToParticle <= 20 * sphereRadius + boundaryLayerThickness) {
 
           // Calculate impulse based on collision normal
           const collisionNormal = particlePosition.clone().sub(sphereCenter).normalize();
