@@ -141,7 +141,7 @@ export class Scene {
     // sThe X axis is red. The Y axis is green. The Z axis is blue.
     // const axesHelper = new THREE.AxesHelper( 5 );
 
-    this.camera.position.z -= 40;
+    this.camera.position.z -= 200;
     // this.scene.add(axesHelper);
     const gui = new GUI();
       gui.add(this.settings, "nacaCode").name("NACA Code").onChange((newValue: string) => {
@@ -254,7 +254,7 @@ export class Scene {
 
     const { camera, scene, renderer } = this;
 
-    const resolution = 0.04;
+    const resolution = 0.1;
 
     const foils = [];
 
