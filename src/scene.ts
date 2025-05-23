@@ -20,13 +20,16 @@ export class Scene {
   scene: THREE.Scene;
   settings: {
     nacaCode: string;
-    compareNacaCode: string;
     chord: number;
+    compareNacaCode: string;
     particleSize: number;
     showWireframe: boolean;
     particleSpeed: number;
     airFriction: number;
     particleCount: number;
+    particleOpacity: number;
+    distanceF: number;
+    velocityF: number;
     reset: () => void;
   };
   renderer: THREE.WebGLRenderer;
@@ -59,27 +62,47 @@ export class Scene {
     // Load the saved NACA code from localStorage if available
     const savedNacaCode = localStorage.getItem("nacaCode") || '2412';
     console.log("Saved NACA code:", savedNacaCode);
-    const savedCompareNacaCode = localStorage.getItem("compareNacaCode") || '0015';
+    const savedCompareNacaCode = localStorage.getItem("compareNacaCode") || '23012';
     console.log("Compare NACA code:", savedCompareNacaCode);
-    const savedChord = localStorage.getItem("chord") || '5';
-    console.log("Saved chord:", savedChord);
-    const savedAirFriction = localStorage.getItem("airFriction") || '0.6';
+    const savedAirFriction = localStorage.getItem("airFriction") || '0.61';
     console.log("Saved air friction:", savedAirFriction);
-    const savedParticleCount = localStorage.getItem("particleCount") || '1800';
+    const savedParticleCount = localStorage.getItem("particleCount") || '6600';
     console.log("Saved particle count:", savedParticleCount);
+    // Load the saved particle size from localStorage if available
+    const savedParticleSize = localStorage.getItem("particleSize") || '8.9';
+    console.log("Saved particle size:", savedParticleSize);
+    // Load the saved particle speed from localStorage if available
+    const savedParticleSpeed = localStorage.getItem("particleSpeed") || '6.95';
+    console.log("Saved particle speed:", savedParticleSpeed);
+    const savedParticleOpacity = localStorage.getItem("particleOpacity") || '0.5';
+    console.log("Saved particle opacity:", savedParticleOpacity);
+    const savedDistanceFactor = localStorage.getItem("distanceF") || '1.1';
+    console.log("Saved distance factor:", savedDistanceFactor);
+    const savedVelocityFactor = localStorage.getItem("velocityF") || '2';
+    console.log("Saved velocity factor:", savedVelocityFactor);
     this.settings = {
       nacaCode: savedNacaCode || "2412",
       compareNacaCode: savedCompareNacaCode || "23012",
-      chord: parseInt(savedChord) || 5,
       showWireframe: false,
-      particleSize: 3,
-      particleSpeed: 5.5,
-      particleCount: parseInt(savedParticleCount) || 1800,
-      airFriction: parseFloat(savedAirFriction) || 0.6,
+      chord: 8,
+      particleSize: parseFloat(savedParticleSize) || 8.9,
+      particleOpacity: parseFloat(savedParticleOpacity) || 0.5,
+      particleSpeed: parseFloat(savedParticleSpeed) || 6.95,
+      particleCount: parseInt(savedParticleCount) || 6600,
+      airFriction: parseFloat(savedAirFriction) || 0.61,
+      distanceF:  parseFloat(savedDistanceFactor) || 1.1,
+      velocityF:  parseFloat(savedVelocityFactor) || 2.0,
       reset: () => {
         localStorage.removeItem("nacaCode");
-        localStorage.removeItem("chord");
         localStorage.removeItem("airFriction");
+        localStorage.removeItem("particleCount");
+        localStorage.removeItem("particleSize");
+        localStorage.removeItem("particleSpeed");
+        localStorage.removeItem("particleOpacity");
+        localStorage.removeItem("showWireframe");
+        localStorage.removeItem("compareNacaCode");
+        localStorage.removeItem("distanceF");
+        localStorage.removeItem("velocityF");
         location.reload(); // Refresh the page
       },
     };
@@ -115,20 +138,28 @@ export class Scene {
           location.reload();
         }
       });
-      gui.add(this.settings, "chord", 1, 10, 1).name("Chord").onChange((newValue: number) => {
-        localStorage.setItem("chord", newValue.toString()); // Save the new value to localStorage
-        location.reload(); // Refresh the page
-      });
-      gui.add(this.settings, "particleCount", 1000, 12800, 100).name("Particle Count").onChange((newValue: number) => {
+      gui.add(this.settings, "particleCount", 1000, 22800, 100).name("Particle Count").onChange((newValue: number) => {
         localStorage.setItem("particleCount", newValue.toString()); // Save the new value to localStorage
         location.reload(); // Refresh the page
       });
-      gui.add(this.settings, "particleSpeed", 0.15, 10, 0.1).name("Particle Speed");
+      gui.add(this.settings, "particleSpeed", 0.15, 15, 0.1).name("Particle Speed").onChange((newValue: number) => {
+        localStorage.setItem("particleSpeed", newValue.toString()); // Save the new value to localStorage
+      });
+      gui.add(this.settings, "particleOpacity", 0, 1, 0.01).name("Particle Opacity").onChange((newValue: number) => {
+        localStorage.setItem("particleOpacity", newValue.toString()); // Save the new value to localStorage
+        const particlesObject = this.scene.getObjectByName("particles");
+        const particleMaterial = particlesObject instanceof THREE.Points ? particlesObject.material as THREE.PointsMaterial : null;
+        if (particleMaterial) {
+          particleMaterial.opacity = newValue;
+          particleMaterial.needsUpdate = true;
+        }
+      });
       gui.add(this.settings, "airFriction", 0, 1, 0.01).name("Air Friction").onChange((newValue: number) => {
         localStorage.setItem("airFriction", newValue.toString()); // Save the new value to localStorage
         location.reload(); // Refresh the page
       });
       gui.add(this.settings, "showWireframe").name("Wireframe Only").onChange((newValue: boolean) => {
+        localStorage.setItem("showWireframe", newValue.toString()); // Save the new value to localStorage
         this.scene.traverse((object) => {
           if (object instanceof THREE.Mesh) {
             if (object.material instanceof THREE.MeshStandardMaterial) {
@@ -139,13 +170,22 @@ export class Scene {
           }
         });
       });
-      gui.add(this.settings, "particleSize", 0.1, 10, 0.1).name("Particle Size").onChange((newValue: number) => {
+      gui.add(this.settings, "particleSize", 0.1, 18, 0.1).name("Particle Size").onChange((newValue: number) => {
+        localStorage.setItem("particleSize", newValue.toString()); // Save the new value to localStorage
         const particlesObject = this.scene.getObjectByName("particles");
         const particleMaterial = particlesObject instanceof THREE.Points ? particlesObject.material as THREE.PointsMaterial : null;
         if (particleMaterial) {
           particleMaterial.size = newValue;
           particleMaterial.needsUpdate = true;
         }
+      });
+      gui.add(this.settings, "distanceF", 0.1, 5, 0.1).name("Distance Factor").onChange((newValue: number) => {
+        localStorage.setItem("distanceF", newValue.toString());
+        location.reload(); // Refresh the page
+      });
+      gui.add(this.settings, "velocityF", 0.1, 10, 0.1).name("Velocity Factor").onChange((newValue: number) => {
+        localStorage.setItem("velocityF", newValue.toString());
+        location.reload(); // Refresh the page
       });
       gui.add({ info: "←→ Use Arrow Keys" }, "info")
       .name("Angle of Attack")
@@ -290,8 +330,8 @@ export class Scene {
     );
     const particleMaterial = new THREE.PointsMaterial({
       vertexColors: true, // Enable vertex colors to allow color blending
-      size: 3.0, // Slightly larger size for a blurrier effect
-      opacity: 0.9, // More transparent for a softer, blurry look
+      size: this.settings.particleSize, // Slightly larger size for a blurrier effect
+      opacity: this.settings.particleOpacity, // More transparent for a softer, blurry look
       transparent: true, // Enable transparency
       blending: THREE.AdditiveBlending, // Additive blending for a glowing effect
       depthWrite: false, // Disable depth writing for a smoother appearance
@@ -314,7 +354,7 @@ export class Scene {
     for (let i = 0; i < colors.length; i += 3) {
       colors[i] = 0.01; // Red
       colors[i + 1] = 0.01; // Green
-      colors[i + 2] = 0.1; // Blue
+      colors[i + 2] = 0.01; // Blue
     }
     particleGeometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
     particleMaterial.vertexColors = true;
@@ -494,23 +534,30 @@ export class Scene {
       console.log(`Optimal rotation for maximum projection on X-axis: ${optimalRotation}`);
     };
 
-    adjustFoilRotation();
+    //adjustFoilRotation();
 
-    let nuTilde = 0;
     const animate = () => {
       requestAnimationFrame(animate);
       const delta = this.clock.getDelta();
 
       const positions = particleGeometry.attributes.position.array;
 
-      // Update particle positions based on Rapier physics simulation
+      // Update Rapier physics simulation
       rapierWorld.step();
 
       const [rotation, position] = updateFoilRotationPosition();
 
       // Update boundingSphereGroup physics
       boundingSphereGroup.rotation.z = rotation;
-      boundingSphereGroup.position.y = position
+      boundingSphereGroup.position.y = position;
+
+      // Precompute reusable values for performance
+      const sphereCenters = boundingSpheres.map(sphere => new THREE.Vector3(sphere.center.x, foil.position.y, sphere.center.z));
+      const sphereRadii = boundingSpheres.map(sphere => sphere.radius);
+      const sphereCenterline = boundingSpheres.reduce(
+      (acc, sphere) => acc.add(sphere.center),
+      new THREE.Vector3(0, 0, 0)
+      ).divideScalar(boundingSpheres.length);
 
       // Sync particle positions with Rapier rigid bodies
       for (let i = 0; i < particleCount; i++) {
@@ -530,157 +577,145 @@ export class Scene {
         const newY = radius * Math.sin(phi) * Math.sin(theta); // Y coordinate
         const newZ = radius * Math.cos(phi); // Z coordinate
         rigidBody.setTranslation({ x: newX, y: newY, z: newZ }, true);
-        colors[index] = 0.001; // Red
-        colors[index + 1] = 0.005; // Green
-        colors[index + 2] = 0.1; // Blue
+        colors[index] = 0.01; // Red
+        colors[index + 1] = 0.01; // Green
+        colors[index + 2] = 0.01; // Blue
       } else {
-       rigidBody.setTranslation({ x: newX, y: translation.y, z: translation.z }, true);
+        rigidBody.setTranslation({ x: newX, y: translation.y, z: translation.z }, true);
       }
 
       // Check for collisions with bounding spheres
-      for (const sphere of boundingSpheres) {
-        const sphereCenter = new THREE.Vector3(
-        sphere.center.x,
-        foil.position.y,
-        sphere.center.z
-        );
+      for (let j = 0; j < boundingSpheres.length; j++) {
+        const sphereCenter = sphereCenters[j];
+        const sphereRadius = sphereRadii[j];
+
         const particlePosition = new THREE.Vector3(
-        translation.x,
-        translation.y,
-        translation.z
-        );
-        const distance = sphereCenter.distanceTo(particlePosition);
-
-        if (distance <= (sphere.radius * 1) * ((this.settings.airFriction*20)^2)) {
-        // Calculate impulse based on collision normal
-
-        const offset = new THREE.Vector3(0, sphere.radius, 0);
-        const newPosition = particlePosition.clone().add(offset);
-        const yimpulse = new THREE.Vector3(0, 0, 0);
-
-        // Apply Spalart-Allmaras turbulence model
-        nuTilde = Math.max(0, this.settings.airFriction * 0.2); // Turbulent viscosity-like term
-        const distanceToFoil = Math.max(0.001, distance); // Avoid division by zero
-        const viscosity = 0.0000181; // Dynamic viscosity of air (kg/m·s)
-        const density = 1.225; // Air density (kg/m³)
-
-        // Compute eddy viscosity using Spalart-Allmaras model
-        const chi = nuTilde / viscosity;
-        const fv1 = chi / (chi + Math.pow(chi, 3));
-        const eddyViscosity = nuTilde * fv1;
-
-        // Apply wind acceleration
-        const foilCenter = boundingSphereGroup.position;
-        const windAcceleration = new THREE.Vector3(
-          0.5,
-          (foilCenter.y / 10 - translation.y),
-          (foilCenter.z - translation.z) * 0.02
-        );
-        rigidBody.applyImpulse(
-          { x: windAcceleration.x, y: windAcceleration.y, z: windAcceleration.z },
-          true
+          translation.x,
+          translation.y,
+          translation.z
         );
 
-        const relativeVelocity = new THREE.Vector3(
-          rigidBody.linvel().x - windAcceleration.x,
-          rigidBody.linvel().y - windAcceleration.y,
-          rigidBody.linvel().z - windAcceleration.z
-        );
+        // Factor in boundary layer dynamics
+        const boundaryLayerThickness = Math.max(2, sphereRadius * 2); // Approximate boundary layer thickness
+        const distanceToParticle = sphereCenter.distanceTo(particlePosition);
         
-        const turbulentForce = relativeVelocity
-          .clone()
-          .multiplyScalar(-eddyViscosity / distanceToFoil);
 
-        rigidBody.applyImpulse(
-          { x: turbulentForce.x, y: turbulentForce.y, z: turbulentForce.z },
-          true
-        );
+        if (distanceToParticle <= 20) {
 
-        // Update nuTilde based on production and destruction terms
-        const production = eddyViscosity * Math.pow(relativeVelocity.length(), 2);
-        const destruction = (nuTilde * Math.pow(distanceToFoil, -2)) * density;
-        const dNuTilde = production - destruction;
+          // Calculate impulse based on collision normal
+          const collisionNormal = particlePosition.clone().sub(sphereCenter).normalize();
+          const penetrationDepth = sphereRadius + boundaryLayerThickness - distanceToParticle;
 
-        // Adjust nuTilde for the next frame
-        nuTilde += dNuTilde * delta;
-
-        // Ensure the particle is displaced based on its position relative to the sphere
-        const leadingEdgeOffset = foil.position.x - this.settings.chord / 2; // Calculate leading edge offset
-        if (particlePosition.x < leadingEdgeOffset) {
-          // If the particle is near the leading edge, apply a stronger upward impulse
-          yimpulse.y = Math.abs(newPosition.x) * 0.2; // Increase y impulse near the leading edge
-          rigidBody.setTranslation(
-            { x: particlePosition.x, y: particlePosition.y + 0.2, z: particlePosition.z },
-            true
-          );
-        } else if (particlePosition.y > sphere.radius) {
-          yimpulse.y = newPosition.x * 0.1; // Increase y as x increases
-          rigidBody.setTranslation(
-            { x: particlePosition.x, y: particlePosition.y + 0.1, z: particlePosition.z },
-            true
-          );
-        } else {
-          yimpulse.y = -newPosition.x * 0.1; // Decrease y as x increases
-          rigidBody.setTranslation(
-            { x: particlePosition.x, y: particlePosition.y - 0.1, z: particlePosition.z },
-            true
-          );
-        }
-
-        // Add random turbulence
-        if (Math.random() < 0.2) {
-          const turbulence = new THREE.Vector3(
-          (Math.random() - 0.5) * 0.5,
-          (Math.random() - 0.5) * 0.5,
-          (Math.random() - 0.5) * 0.5
-          );
+          // Apply boundary layer effect
+          const boundaryLayerEffect = collisionNormal.multiplyScalar(penetrationDepth * 0.5);
           rigidBody.applyImpulse(
-          { x: turbulence.x, y: turbulence.y, z: turbulence.z },
-          false
+            { x: boundaryLayerEffect.x, y: -boundaryLayerEffect.y, z: boundaryLayerEffect.z },
+            true
           );
-        }
 
-        // Apply lift force
-        const liftForce = new THREE.Vector3(0, Math.abs(foil.rotation.z) * 2.9, 0);
-        rigidBody.applyImpulse(
-          { x: liftForce.x, y: liftForce.y, z: liftForce.z },
+          // Adjust particle velocity to simulate boundary layer drag
+          const dragCoefficient = 0.05; // Adjust drag coefficient for boundary layer
+          const velocity = new THREE.Vector3(
+            rigidBody.linvel().x,
+            rigidBody.linvel().y,
+            rigidBody.linvel().z
+          );
+
+          const dragForce = velocity.clone().multiplyScalar(-dragCoefficient);
+          rigidBody.applyImpulse(
+            { x: dragForce.x, y: dragForce.y, z: dragForce.z },
+            true
+          );
+
+          // Apply a force to pull particles towards the sphereCenterline
+          const convexityFactor = sphereCenterline.y > sphereCenter.y ? -1 : 1; // Determine convexity based on relative position
+          const pullStrength = 500 * convexityFactor; // Adjust the strength of the pull based on convexity
+          const pullForce = sphereCenterline.clone().sub(particlePosition).normalize().multiplyScalar(pullStrength);
+          rigidBody.applyImpulse(
+          { x: 0, y: pullForce.y, z: 0},
           true
-        );
+          );
 
-        const velocityMagnitude = Math.sqrt(
-          rigidBody.linvel().x ** 2 +
-          rigidBody.linvel().y ** 2 +
-          rigidBody.linvel().z ** 2
-        );
-        const centerlineDistance = Math.abs(rigidBody.translation().y - foil.position.y);
-        const centerlineFactor = Math.max(0, 1 - centerlineDistance / (sphere.radius));
-        const velocityFactor = Math.min(1, velocityMagnitude / 1000); // Scale velocity factor
+          const tangent = collisionNormal
+            .clone()
+            .cross(new THREE.Vector3(0, 1, 0))
+            .normalize();
 
-        let iscalar = (centerlineFactor + velocityFactor) / 2; // Combine factors
+          const centerlineOffset = sphereCenterline.clone().sub(sphereCenter);
+          const adjustedTangent = tangent.add(centerlineOffset.normalize()).normalize();
 
-        colors[index] = Math.min(1.0 * iscalar, 1); // Red increases with iscalar
-        colors[index + 1] = 0.01; // Green remains constant
-        colors[index + 2] = Math.min(1.0 * (1 - iscalar), 1); // Blue decreases with iscalar
+          const tangentImpulse = adjustedTangent.multiplyScalar(0.1); // Adjust the scalar for the desired impulse strength
+          rigidBody.applyImpulse(
+            { x: tangentImpulse.x, y: tangentImpulse.y, z: tangentImpulse.z },
+            true
+          );
+          
+
+          // Apply Spalart-Allmaras turbulence model
+          const nuTilde = 0.1; // Turbulent viscosity (adjust as needed)
+          const sigma = 2.0 / 3.0; // Turbulent Prandtl number
+          const cb1 = 0.1355; // Model constant
+          const cw1 = cb1 / (sigma ** 2); // Model constant
+          const cw3 = 2.0; // Model constant
+
+          // Compute distance to the wall (foil surface)
+          const distanceToWall = Math.max(0.01, distanceToParticle - sphereRadius);
+
+          // Compute production term
+          const production = cb1 * nuTilde * Math.pow(velocity.length() / distanceToWall, 2);
+
+          // Compute destruction term
+          const destruction = cw1 * Math.pow(nuTilde / boundaryLayerThickness, 2) * (1 + cw3 * Math.pow(nuTilde / boundaryLayerThickness, 2));
+
+          // Update turbulent viscosity
+          const deltaNuTilde = production - destruction;
+          const updatedNuTilde = Math.max(0, nuTilde + deltaNuTilde * delta);
+
+          // Apply turbulent viscosity as an additional drag force
+          const turbulentDragForce = velocity.clone().multiplyScalar(-updatedNuTilde);
+          rigidBody.applyImpulse(
+            { x: Math.min(20000, turbulentDragForce.x/1), y: Math.min(1000, turbulentDragForce.y/1), z: Math.min(1, turbulentDragForce.z/10) },
+            true
+          );
+
+          // Update particle colors based on position and velocity
+          const velocityMagnitude = velocity.length();
+          const centerlineDistance = translation.y - sphereCenterline.y;
+
+          const distanceFactor = Math.min(1, 1 / (distanceToParticle^this.settings.distanceF)); // Fall off at the square of the distance
+          const velocityFactor = Math.min(1, velocityMagnitude / this.settings.velocityF); // Scale velocity factor
+
+          if (centerlineDistance > 0) {
+            // Above the foil (red)
+            colors[index] = Math.min(1.0 * distanceFactor * velocityFactor, 1); // Red increases
+            colors[index + 1] = 0.01; // Green remains constant
+            colors[index + 2] = 0.01; // Blue is zero
+          } else {
+            // Below the foil (blue)
+            colors[index] = 0.01; // Red is zero
+            colors[index + 1] = 0.01; // Green remains constant
+            colors[index + 2] = Math.min(1.0 * distanceFactor * velocityFactor, 1); // Blue increases
+          }
+          break;
         }
       }
 
-      particleGeometry.attributes.color.needsUpdate = true;
-
       // Update particle positions based on rigid body translation
-      positions[index] = rigidBody.translation().x;
-      positions[index + 1] = rigidBody.translation().y;
-      positions[index + 2] = rigidBody.translation().z;
+      positions[index] = translation.x;
+      positions[index + 1] = translation.y;
+      positions[index + 2] = translation.z;
       }
 
       particleGeometry.attributes.position.needsUpdate = true;
+      particleGeometry.attributes.color.needsUpdate = true;
 
       this.controls.update(delta);
       composer.render(delta);
-      
     };
 
     animate();
   }
+  
 
   getFoilMesh(foil: Vector2NacaFoil, extrude_depth: number = 10) {
     const shape = new THREE.Shape(foil.getVectors());
