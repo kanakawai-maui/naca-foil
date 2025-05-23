@@ -418,11 +418,11 @@ export class Scene {
     const boundingSphereGroup = new THREE.Group();
     
 
-    for (let i = 0; i < foilVertices.length; i += 10) {
-      for (let z = -depth/2; z <= depth/2; z += depth / 20) {
+    for (let i = 0; i < foilVertices.length; i += 1) {
+      for (let z = -depth; z <= 0; z += depth/20) {
         const radii = Math.abs((foilVertices[i].y)); // Use 1/2 the difference between upper and lower edges as the radius
         const vertex = new THREE.Vector3(
-          foilVertices[i].x + radii,
+          foilVertices[i].x,
           0,
           z+depth
         );
