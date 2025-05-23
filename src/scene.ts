@@ -24,12 +24,14 @@ export class Scene {
     compareNacaCode: string;
     particleSize: number;
     showWireframe: boolean;
+    showBoundaryLines: boolean;
     particleSpeed: number;
     airFriction: number;
     particleCount: number;
     particleOpacity: number;
-    distanceF: number;
-    velocityF: number;
+    turbulentViscosity: number;
+    boundaryLayerSize: number;
+    compareNacaPositionX: number;
     reset: () => void;
   };
   renderer: THREE.WebGLRenderer;
@@ -72,26 +74,35 @@ export class Scene {
     const savedParticleSize = localStorage.getItem("particleSize") || '14.6';
     console.log("Saved particle size:", savedParticleSize);
     // Load the saved particle speed from localStorage if available
-    const savedParticleSpeed = localStorage.getItem("particleSpeed") || '2.75';
+    const savedParticleSpeed = localStorage.getItem("particleSpeed") || '990';
     console.log("Saved particle speed:", savedParticleSpeed);
-    const savedParticleOpacity = localStorage.getItem("particleOpacity") || '0.5';
+    const savedParticleOpacity = localStorage.getItem("particleOpacity") || '0.76';
     console.log("Saved particle opacity:", savedParticleOpacity);
-    const savedDistanceFactor = localStorage.getItem("distanceF") || '1.0';
-    console.log("Saved distance factor:", savedDistanceFactor);
-    const savedVelocityFactor = localStorage.getItem("velocityF") || '6.0';
-    console.log("Saved velocity factor:", savedVelocityFactor);
+    const savedTurbulentViscosity = localStorage.getItem("turbulentViscosity") || '0.5';
+    console.log("Saved turbulent viscosity:", savedTurbulentViscosity);
+    const savedShowWireframe = localStorage.getItem("showWireframe") || 'false';
+    console.log("Saved show wireframe:", savedShowWireframe);
+    const savedBoundaryLayerSize = localStorage.getItem("boundaryLayerSize") || '0.1';
+    console.log("Saved boundary layer size:", savedBoundaryLayerSize);
+    const savedShowBoundaryLines = localStorage.getItem("showBoundaryLines") || 'false';
+    console.log("Saved show boundary lines:", savedShowBoundaryLines);
+    const savedCompareNacaPositionX = localStorage.getItem("compareNacaPositionX") || '10';
+    console.log("Saved compare NACA position X:", savedCompareNacaPositionX);
+    
     this.settings = {
       nacaCode: savedNacaCode || "2412",
       compareNacaCode: savedCompareNacaCode || "",
-      showWireframe: false,
+      showWireframe: savedShowWireframe === 'true',
+      showBoundaryLines: savedShowBoundaryLines === 'true',
       chord: 8,
       particleSize: parseFloat(savedParticleSize) || 14.6,
-      particleOpacity: parseFloat(savedParticleOpacity) || 0.5,
-      particleSpeed: parseFloat(savedParticleSpeed) || 2.75,
+      particleOpacity: parseFloat(savedParticleOpacity) || 0.76,
+      particleSpeed: parseFloat(savedParticleSpeed) || 990,
       particleCount: parseInt(savedParticleCount) || 5000,
       airFriction: parseFloat(savedAirFriction) || 0.01,
-      distanceF:  parseFloat(savedDistanceFactor) || 1.0,
-      velocityF:  parseFloat(savedVelocityFactor) || 6.0,
+      turbulentViscosity: parseFloat(savedTurbulentViscosity) || 0.1,
+      boundaryLayerSize: parseFloat(savedBoundaryLayerSize) || 0.1,
+      compareNacaPositionX: parseFloat(savedCompareNacaPositionX) || 10,
       reset: () => {
         localStorage.removeItem("nacaCode");
         localStorage.removeItem("airFriction");
@@ -101,8 +112,10 @@ export class Scene {
         localStorage.removeItem("particleOpacity");
         localStorage.removeItem("showWireframe");
         localStorage.removeItem("compareNacaCode");
-        localStorage.removeItem("distanceF");
-        localStorage.removeItem("velocityF");
+        localStorage.removeItem("turbulentViscosity");
+        localStorage.removeItem("boundaryLayerSize");
+        localStorage.removeItem("showBoundaryLines");
+        localStorage.removeItem("compareNacaPositionX");
         location.reload(); // Refresh the page
       },
     };
@@ -126,7 +139,7 @@ export class Scene {
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     // An axis object to visualize the 3 axes in a simple way.
     // sThe X axis is red. The Y axis is green. The Z axis is blue.
-    const axesHelper = new THREE.AxesHelper( 5 );
+    // const axesHelper = new THREE.AxesHelper( 5 );
 
     this.camera.position.z -= 40;
     // this.scene.add(axesHelper);
@@ -142,20 +155,21 @@ export class Scene {
         localStorage.setItem("particleCount", newValue.toString()); // Save the new value to localStorage
         location.reload(); // Refresh the page
       });
-      gui.add(this.settings, "particleSpeed", 0.15, 15, 0.1).name("Particle Speed").onChange((newValue: number) => {
+      gui.add(this.settings, "particleSpeed", 180, 2000, 10).name("Velocity (km/h)").onChange((newValue: number) => {
         localStorage.setItem("particleSpeed", newValue.toString()); // Save the new value to localStorage
       });
-      gui.add(this.settings, "particleOpacity", 0, 1, 0.01).name("Particle Opacity").onChange((newValue: number) => {
-        localStorage.setItem("particleOpacity", newValue.toString()); // Save the new value to localStorage
-        const particlesObject = this.scene.getObjectByName("particles");
-        const particleMaterial = particlesObject instanceof THREE.Points ? particlesObject.material as THREE.PointsMaterial : null;
-        if (particleMaterial) {
-          particleMaterial.opacity = newValue;
-          particleMaterial.needsUpdate = true;
-        }
-      });
-      gui.add(this.settings, "airFriction", 0, 1, 0.01).name("Air Friction").onChange((newValue: number) => {
+      gui.add(this.settings, "airFriction", 0, 1, 0.01).name("Drag Coefficient").onChange((newValue: number) => {
         localStorage.setItem("airFriction", newValue.toString()); // Save the new value to localStorage
+      });
+      gui.add(this.settings, "turbulentViscosity", 0, 0.99, 0.01).name("Turbulent Viscosity").onChange((newValue: number) => {
+        localStorage.setItem("turbulentViscosity", newValue.toString()); // Save the new value to localStorage
+      });
+      gui.add(this.settings, "boundaryLayerSize", 0, 1, 0.01).name("Bound. Layer Size").onChange((newValue: number) => {
+        localStorage.setItem("boundaryLayerSize", newValue.toString()); // Save the new value to localStorage
+        location.reload(); // Refresh the page
+      });
+      gui.add(this.settings, "showBoundaryLines").name("Boundary Lines").onChange((newValue: boolean) => {
+        localStorage.setItem("showBoundaryLines", newValue.toString()); // Save the new value to localStorage
         location.reload(); // Refresh the page
       });
       gui.add(this.settings, "showWireframe").name("Wireframe Only").onChange((newValue: boolean) => {
@@ -170,6 +184,7 @@ export class Scene {
           }
         });
       });
+
       gui.add(this.settings, "particleSize", 0.1, 18, 0.1).name("Particle Size").onChange((newValue: number) => {
         localStorage.setItem("particleSize", newValue.toString()); // Save the new value to localStorage
         const particlesObject = this.scene.getObjectByName("particles");
@@ -179,29 +194,42 @@ export class Scene {
           particleMaterial.needsUpdate = true;
         }
       });
-      gui.add(this.settings, "distanceF", 0.1, 5, 0.1).name("Distance Factor").onChange((newValue: number) => {
-        localStorage.setItem("distanceF", newValue.toString());
+      gui.add(this.settings, "particleOpacity", 0, 1, 0.01).name("Particle Opacity").onChange((newValue: number) => {
+        localStorage.setItem("particleOpacity", newValue.toString()); // Save the new value to localStorage
+        const particlesObject = this.scene.getObjectByName("particles");
+        const particleMaterial = particlesObject instanceof THREE.Points ? particlesObject.material as THREE.PointsMaterial : null;
+        if (particleMaterial) {
+          particleMaterial.opacity = newValue;
+          particleMaterial.needsUpdate = true;
+        }
       });
-      gui.add(this.settings, "velocityF", 0.1, 10, 0.1).name("Velocity Factor").onChange((newValue: number) => {
-        localStorage.setItem("velocityF", newValue.toString());
+      
+      const compareFolder = gui.addFolder("Compare Settings");
+
+      compareFolder.add(this.settings, "compareNacaCode").name("Compare Last").onChange((newValue: string) => {
+        if (newValue === "") {
+          localStorage.removeItem("compareNacaCode");
+          location.reload();
+        }
+        const isValidNacaCode = /^[0-9]{4,5}$/.test(newValue);
+        if (isValidNacaCode) {
+          localStorage.setItem("compareNacaCode", newValue); // Save the new value to localStorage
+          location.reload();
+        }
       });
+
+      compareFolder.add(this.settings, "compareNacaPositionX", 8, 80, 1).name("Compare Position").onChange((newValue: number) => {
+        localStorage.setItem("compareNacaPositionX", newValue.toString()); // Save the new value to localStorage
+        location.reload(); // Refresh the page
+      });
+
       gui.add({ info: "←→ Use Arrow Keys" }, "info")
       .name("Angle of Attack")
       .disable();
       gui.add({ info: "↑↓ Use Arrow Keys" }, "info")
       .name("Altitude")
       .disable();
-      // gui.add(this.settings, "compareNacaCode").name("Compare Last").onChange((newValue: string) => {
-      //   if(newValue === "") {
-      //     localStorage.removeItem("compareNacaCode");
-      //     location.reload();
-      //   }
-      //   const isValidNacaCode = /^[0-9]{4,5}$/.test(newValue);
-      //   if (isValidNacaCode) {
-      //     localStorage.setItem("compareNacaCode", newValue); // Save the new value to localStorage
-      //     location.reload();
-      //   }
-      // });
+      
 
       gui.add(this.settings, "reset").name("Reset").onChange(() => {
         localStorage.removeItem("nacaCode");
@@ -210,11 +238,12 @@ export class Scene {
         localStorage.removeItem("particleCount");
         localStorage.removeItem("particleSize");
         localStorage.removeItem("particleSpeed");
+        localStorage.removeItem("turbulentViscosity");
         localStorage.removeItem("particleOpacity");
+        localStorage.removeItem("boundaryLayerSize");
+        localStorage.removeItem("showBoundaryLines");
         localStorage.removeItem("showWireframe");
         localStorage.removeItem("compareNacaCode");
-        localStorage.removeItem("distanceF");
-        localStorage.removeItem("velocityF");
         location.reload(); // Refresh the page
       });
   }
@@ -229,26 +258,51 @@ export class Scene {
 
     const foils = [];
 
-    let depth = 10;
+    let depth = 1;
 
     const vectors = new Vector2NacaFoil(this.settings.chord, this.settings.nacaCode, resolution);
 
     const foil = this.getFoilMesh(vectors, depth);
+
+    // Add boundary lines for the foil
+    if(this.settings.showBoundaryLines) {
+      const shape = new THREE.Shape(vectors.getVectors());
+      const foilEdgesGeometry = new THREE.EdgesGeometry(new THREE.ShapeGeometry(shape));
+      const foilLineMaterial = new THREE.LineDashedMaterial({ color: 0xffffff });
+      const foilBoundaryLines = new THREE.LineSegments(foilEdgesGeometry, foilLineMaterial);
+      const scaledBoundaryLines = foilBoundaryLines.clone();
+      const scaleFactor = 1 + this.settings.boundaryLayerSize;
+      scaledBoundaryLines.scale.set(scaleFactor, scaleFactor, 0);
+      scaledBoundaryLines.position.set(0, 0, depth/2);
+      foil.add(scaledBoundaryLines);
+      for (let i = 3; i <= 5; i++) {
+        const scaledBoundaryLines = foilBoundaryLines.clone();
+        const scaleFactor = Math.pow(i + 0.1, 1.1);
+        scaledBoundaryLines.scale.set(scaleFactor/3, scaleFactor/3, 0);
+        scaledBoundaryLines.position.set(0, 0, depth/2);
+        scaledBoundaryLines.position.x -= 0.25;
+        foil.add(scaledBoundaryLines);
+      }
+
+    }
 
     foil.name = "foil"; // Assign a unique name
     
     scene.add(foil);
     foils.push(foil);
 
-    // if(this.settings.compareNacaCode !== "") {
-    //   depth = 5;
-    //   const vectorsAlt = new Vector2NacaFoil(this.settings.chord, this.settings.compareNacaCode, resolution);
-    //   const foilAlt = this.getFoilMesh(vectorsAlt, depth);
-    //   foilAlt.name = "foil"; // Assign a unique name
-    //   scene.add(foilAlt);
-    //   foilAlt.position.z = 5;
-    //   foils.push(foilAlt);
-    // }
+    let foilAlt = null;
+    let vectorsAlt = null;
+
+
+    if(this.settings.compareNacaCode !== "") {
+      depth = 5;
+      vectorsAlt = new Vector2NacaFoil(this.settings.chord, this.settings.compareNacaCode, resolution);
+      foilAlt = this.getFoilMesh(vectorsAlt, depth);
+      foilAlt.name = "foil"; // Assign a unique name
+      scene.add(foilAlt);
+      foilAlt.position.x = -this.settings.compareNacaPositionX;
+    }
 
     const skyColor = 0xB1E1FF; // light blue
     const groundColor = 0xB97A20; // brownish orange
@@ -301,7 +355,7 @@ export class Scene {
     const tunnelMesh = new THREE.Mesh(tunnelGeometry, tunnelMaterial);
     tunnelMesh.rotation.z = Math.PI / 2; // Rotate to align with the scene
     tunnelMesh.position.set(0, 0, this.settings.chord / 2); // Center the tunnel
-    scene.add(tunnelMesh);
+    //scene.add(tunnelMesh);
 
     // Restrict camera movement to stay within the tunnel
     const tunnelRadius = 20;
@@ -331,12 +385,7 @@ export class Scene {
     const particleGeometry = new THREE.BufferGeometry();
     const particlePositions = new Float32Array(particleCount * 3);
 
-    // Set air friction (linear and angular damping) globally for all particles
-    // Set linear and angular damping based on air friction
-    const linearDamping = Math.max(0, 1 - this.settings.airFriction * 2.5); // Increased linear damping for stronger air resistance
-    const angularDamping = Math.max(0, 1 - this.settings.airFriction * 2.0); // Increased angular damping for stronger air resistance
 
-    console.log("Enhanced Linear Damping:", linearDamping, "Enhanced Angular Damping:", angularDamping); // Log enhanced damping values for debugging
 
     particleGeometry.setAttribute(
       "position",
@@ -391,12 +440,8 @@ export class Scene {
       const colliderDesc = RAPIER.ColliderDesc.ball(1); // Small radius for particles
       const collider = rapierWorld.createCollider(colliderDesc, rigidBody);
       if (!collider) {
-      console.error("Failed to create collider for the rigid body.");
+        console.error("Failed to create collider for the rigid body.");
       }
-
-      // Apply air friction to the particle's velocity
-      rigidBody.setLinearDamping(linearDamping); // Set linear damping for air resistance
-      rigidBody.setAngularDamping(angularDamping); // Set angular damping for air resistance
 
       particleBodies.push(rigidBody);
     }
@@ -413,13 +458,17 @@ export class Scene {
     }
 
     // Create a group of overlapping bounding spheres representing the foil
-    const foilVertices = vectors.getCoreVectors();
+    let foilVertices = vectors.getCoreVectors();
+
+    if(foilAlt && vectorsAlt) {
+      const foilVerticesAlt = vectorsAlt.getCoreVectors();
+      foilVertices = [...foilVertices, ...foilVerticesAlt];
+    }
 
     const boundingSphereGroup = new THREE.Group();
     
-
     for (let i = 0; i < foilVertices.length; i += 1) {
-      for (let z = -depth; z <= 0; z += depth/20) {
+      for (let z = -depth; z <= 0; z += depth/10) {
         const radii = Math.abs((foilVertices[i].y)); // Use 1/2 the difference between upper and lower edges as the radius
         const vertex = new THREE.Vector3(
           foilVertices[i].x,
@@ -497,8 +546,8 @@ export class Scene {
     // scene.add(boundingSphereGroup);
 
     // Make the foil tip up and down based on arrow key input
-    const rotationFactor = 0.05; // Adjust amplitude
-    const distanceFactor = 0.5; // Adjust distance
+    const rotationFactor = 0.1; // Adjust amplitude
+    const distanceFactor = 1.0; // Adjust distance
    
     // Smoothly listen for arrow key input
     let targetRotationZ = foil.rotation.z;
@@ -532,26 +581,47 @@ export class Scene {
       let maxWidth = initialWidth;
       let optimalRotation = foil.rotation.z;
 
-      for (let angle = 0; angle <= Math.PI * 2; angle += 0.01) {
-      foil.rotation.z = angle;
-      const testBoundingBox = new THREE.Box3().setFromObject(foil);
-      const testWidth = testBoundingBox.max.x - testBoundingBox.min.x;
+      for (let angle = 0; angle <= Math.PI * 2; angle += 1) {
+        foil.rotation.z = angle;
+        foil.position.y -= 0.1;
+        const testBoundingBox = new THREE.Box3().setFromObject(foil);
+        const testWidth = testBoundingBox.max.x - testBoundingBox.min.x;
 
-      if (testWidth > maxWidth) {
-        maxWidth = testWidth;
-        optimalRotation = angle;
-      }
+        if (testWidth > maxWidth) {
+          maxWidth = testWidth;
+          optimalRotation = angle;
+        }
       }
 
       foil.rotation.z = optimalRotation;
       console.log(`Optimal rotation for maximum projection on X-axis: ${optimalRotation}`);
     };
 
-    //adjustFoilRotation();
+    adjustFoilRotation();
+
+    // Add gravity to the foil
+    const gravity = new THREE.Vector3(0, -9.8, 0); // Gravity vector
+
+    const foilMass = 100; // Adjust the mass of the foil as needed
+    const gravityForce = gravity.clone().multiplyScalar(foilMass);
+
+    /*
+    const applyGravityToFoil = (delta) => {
+      // Apply gravity to the foil's position
+      foil.position.y += gravityForce.y * delta * 0.001; // Adjust multiplier for sensitivity
+    };
+    */
 
     const animate = () => {
       requestAnimationFrame(animate);
       const delta = this.clock.getDelta();
+
+      //applyGravityToFoil(delta);
+
+      // Set air friction (linear and angular damping) globally for all particles
+      // Set linear and angular damping based on air friction
+      const linearDamping = Math.max(0, 1 - this.settings.airFriction * 1.5); // Increased linear damping for stronger air resistance
+      const angularDamping = Math.max(0, 1 - this.settings.airFriction * 1.0); // Increased angular damping for stronger air resistance
 
       const positions = particleGeometry.attributes.position.array;
 
@@ -564,194 +634,230 @@ export class Scene {
       boundingSphereGroup.rotation.z = rotation;
       boundingSphereGroup.position.y = position;
 
+
+
       // Precompute reusable values for performance
       const sphereCenters = boundingSpheres.map(sphere => new THREE.Vector3(sphere.center.x, foil.position.y, sphere.center.z));
       const sphereRadii = boundingSpheres.map(sphere => sphere.radius);
       const sphereCenterline = boundingSpheres.reduce(
       (acc, sphere) => acc.add(sphere.center),
-      new THREE.Vector3(0, 0, 0)
+        new THREE.Vector3(0, 0, 0)
       ).divideScalar(boundingSpheres.length);
 
       // Sync particle positions with Rapier rigid bodies
       for (let i = 0; i < particleCount; i++) {
-      const rigidBody = particleBodies[i];
-      const translation = rigidBody.translation();
-      const index = i * 3;
+        const rigidBody = particleBodies[i];
+        const translation = rigidBody.translation();
+        const index = i * 3;
 
-      // Move particles from right to left (positive x direction)
-      let newX = translation.x + this.settings.particleSpeed;
+        // Apply air friction to the particle's velocity
+        rigidBody.setLinearDamping(linearDamping); // Set linear damping for air resistance
+        rigidBody.setAngularDamping(angularDamping); // Set angular damping for air resistance
 
-      // Check for collisions with the tunnel walls
-      const distanceFromCenter = Math.sqrt(translation.y ** 2 + translation.z ** 2);
-      if (distanceFromCenter >= tunnelRadius) {
-        // Reflect the particle back into the tunnel
-        const collisionNormal = new THREE.Vector3(0, translation.y, translation.z).normalize();
-        const velocity = new THREE.Vector3(
-          rigidBody.linvel().x,
-          rigidBody.linvel().y,
-          rigidBody.linvel().z
-        );
+        // Move particles from right to left (positive x direction)
+        let newX = translation.x + THREE.MathUtils.mapLinear(this.settings.particleSpeed, 10, 2000, 0.01, 10);
 
-        // Retain the x velocity while reflecting the y and z components
-        const reflectedVelocity = new THREE.Vector3(
-          velocity.x, // Retain x velocity
-          velocity.y - 2 * velocity.dot(collisionNormal) * collisionNormal.y,
-          velocity.z - 2 * velocity.dot(collisionNormal) * collisionNormal.z
-        );
-        rigidBody.setLinvel({ x: reflectedVelocity.x, y: reflectedVelocity.y, z: reflectedVelocity.z }, true);
-
-        // Adjust position to ensure the particle is inside the tunnel
-        const penetrationDepth = distanceFromCenter - tunnelRadius;
-        const correction = collisionNormal.multiplyScalar(penetrationDepth);
-        rigidBody.setTranslation(
-          { x: translation.x, y: translation.y - correction.y, z: translation.z - correction.z },
-          true
-        );
-      }
-      
-
-      // Wrap particles around to keep them originating from the front of the tunnel
-      if (newX > 100) {
-        newX = Math.random() * 20 - 100; // Reset to a random position between -100 and -80
-        const theta = Math.random() * Math.PI * 2; // Random angle in radians
-        const phi = Math.random() * Math.PI; // Random angle in radians
-        const radius = 20; // Radius for spherical coordinates
-        const newY = radius * Math.sin(phi) * Math.sin(theta); // Y coordinate
-        const newZ = radius * Math.cos(phi); // Z coordinate
-
-        rigidBody.setTranslation({ x: newX, y: newY, z: newZ }, true);
-        colors[index] = 0.01; // Red
-        colors[index + 1] = 0.01; // Green
-        colors[index + 2] = 0.01; // Blue
-      } else {
-        rigidBody.setTranslation({ x: newX, y: translation.y, z: translation.z }, true);
-      }
-
-
-        
-
-      
-
-      // Check for collisions with bounding spheres
-      for (let j = 0; j < boundingSpheres.length; j++) {
-        const sphereCenter = sphereCenters[j];
-        const sphereRadius = sphereRadii[j];
-
-        const particlePosition = new THREE.Vector3(
-          translation.x,
-          translation.y,
-          translation.z
-        );
-
-        // Factor in boundary layer dynamics
-        const boundaryLayerThickness = Math.max(2, sphereRadius * 0.1); // Approximate boundary layer thickness
-        const distanceToParticle = sphereCenter.distanceTo(particlePosition);
-        
-
-        if (distanceToParticle <= 20 * sphereRadius + boundaryLayerThickness) {
-
-          // Calculate impulse based on collision normal
-          const collisionNormal = particlePosition.clone().sub(sphereCenter).normalize();
-          const penetrationDepth = sphereRadius + boundaryLayerThickness - distanceToParticle;
-
-          // Apply boundary layer effect
-          const boundaryLayerEffect = collisionNormal.multiplyScalar(penetrationDepth * 0.5);
-          rigidBody.applyImpulse(
-            { x: boundaryLayerEffect.x, y: -boundaryLayerEffect.y, z: boundaryLayerEffect.z },
-            true
-          );
-
-          // Adjust particle velocity to simulate boundary layer drag
-          const dragCoefficient = 0.05; // Adjust drag coefficient for boundary layer
+        // Check for collisions with the tunnel walls
+        const distanceFromCenter = Math.sqrt(translation.y ** 2 + translation.z ** 2);
+        if (distanceFromCenter >= tunnelRadius) {
+          // Reflect the particle back into the tunnel
+          const collisionNormal = new THREE.Vector3(0, translation.y, translation.z).normalize();
           const velocity = new THREE.Vector3(
             rigidBody.linvel().x,
             rigidBody.linvel().y,
             rigidBody.linvel().z
           );
 
-          const dragForce = velocity.clone().multiplyScalar(-dragCoefficient);
-          rigidBody.applyImpulse(
-            { x: dragForce.x, y: dragForce.y, z: dragForce.z },
+          // Retain the x velocity while reflecting the y and z components
+          const reflectedVelocity = new THREE.Vector3(
+            velocity.x, // Retain x velocity
+            velocity.y - 2 * velocity.dot(collisionNormal) * collisionNormal.y,
+            velocity.z - 2 * velocity.dot(collisionNormal) * collisionNormal.z
+          );
+          rigidBody.setLinvel({ x: reflectedVelocity.x, y: reflectedVelocity.y, z: reflectedVelocity.z }, true);
+
+          // Adjust position to ensure the particle is inside the tunnel
+          const penetrationDepth = distanceFromCenter - tunnelRadius;
+          const correction = collisionNormal.multiplyScalar(penetrationDepth);
+          rigidBody.setTranslation(
+            { x: translation.x, y: translation.y - correction.y, z: translation.z - correction.z },
             true
           );
+        }
+      
 
-          // Apply a force to pull particles towards the sphereCenterline
-          const convexityFactor = sphereCenterline.y > sphereCenter.y ? -1 : 1; // Determine convexity based on relative position
-          const pullStrength = 500 * convexityFactor; // Adjust the strength of the pull based on convexity
-          const pullForce = sphereCenterline.clone().sub(particlePosition).normalize().multiplyScalar(pullStrength);
-          rigidBody.applyImpulse(
-          { x: 0, y: pullForce.y, z: 0},
-          true
+        // Wrap particles around to keep them originating from the front of the tunnel
+        if (newX > 100) {
+          newX = Math.random() * 15 - 100; // Reset to a random position between -100 and -80
+          const theta = Math.random() * Math.PI * 2; // Random angle in radians
+          const phi = Math.random() * Math.PI; // Random angle in radians
+          const radius = 10; // Radius for spherical coordinates
+          const newY = radius * Math.sin(phi) * Math.sin(theta); // Y coordinate
+          const newZ = radius * Math.cos(phi); // Z coordinate
+
+          rigidBody.setTranslation({ x: newX, y: newY, z: newZ }, true);
+          colors[index] = 0.01; // Red
+          colors[index + 1] = 0.01; // Green
+          colors[index + 2] = 0.01; // Blue
+        } else {
+          rigidBody.setTranslation({ x: newX, y: translation.y, z: translation.z }, true);
+        }
+
+        // Apply Spalart-Allmaras turbulence model
+        const nuTilde = this.settings.turbulentViscosity || 0.1; // Turbulent viscosity (adjust as needed)
+        const sigma = 2.0 / 3.0; // Turbulent Prandtl number
+        const cb1 = 0.1355; // Model constant
+        const cw1 = cb1 / (sigma ** 2); // Model constant
+        const cw3 = 2.0; // Model constant
+
+        // Check for collisions with bounding spheres
+        for (let j = 0; j < boundingSpheres.length; j++) {
+          const sphereCenter = sphereCenters[j];
+          const sphereRadius = sphereRadii[j];
+
+          const particlePosition = new THREE.Vector3(
+            translation.x,
+            translation.y,
+            translation.z
           );
 
-          const tangent = collisionNormal
-            .clone()
-            .cross(new THREE.Vector3(0, 1, 0))
-            .normalize();
-
-          const centerlineOffset = sphereCenterline.clone().sub(sphereCenter);
-          const adjustedTangent = tangent.add(centerlineOffset.normalize()).normalize();
-
-          const tangentImpulse = adjustedTangent.multiplyScalar(0.1); // Adjust the scalar for the desired impulse strength
-          rigidBody.applyImpulse(
-            { x: tangentImpulse.x, y: tangentImpulse.y, z: tangentImpulse.z },
-            true
-          );
+          // Factor in boundary layer dynamics
+          const boundaryLayerThickness = Math.max(0.01, sphereRadius * this.settings.boundaryLayerSize); // Approximate boundary layer thickness
+          const distanceToParticle = sphereCenter.distanceTo(particlePosition);
           
 
-          // Apply Spalart-Allmaras turbulence model
-          const nuTilde = 0.1; // Turbulent viscosity (adjust as needed)
-          const sigma = 2.0 / 3.0; // Turbulent Prandtl number
-          const cb1 = 0.1355; // Model constant
-          const cw1 = cb1 / (sigma ** 2); // Model constant
-          const cw3 = 2.0; // Model constant
+          if (distanceToParticle <= 20) {
 
-          // Compute distance to the wall (foil surface)
-          const distanceToWall = Math.max(0.01, distanceToParticle - sphereRadius);
+            if(translation.x > sphereCenter.x + sphereRadius + boundaryLayerThickness) {
+              break;
+            }
 
-          // Compute production term
-          const production = cb1 * nuTilde * Math.pow(velocity.length() / distanceToWall, 2);
+            // Calculate impulse based on collision normal
+            const collisionNormal = particlePosition.clone().sub(sphereCenter).normalize();
+            const penetrationDepth = sphereRadius + boundaryLayerThickness - distanceToParticle;
 
-          // Compute destruction term
-          const destruction = cw1 * Math.pow(nuTilde / boundaryLayerThickness, 2) * (1 + cw3 * Math.pow(nuTilde / boundaryLayerThickness, 2));
+            // Apply boundary layer effect
+            const boundaryLayerEffect = collisionNormal.multiplyScalar(penetrationDepth * 0.5);
+            rigidBody.applyImpulse(
+              { x: boundaryLayerEffect.x * (1/Math.pow(distanceToParticle,2)), y: boundaryLayerEffect.y* (1/Math.pow(distanceToParticle,2)), z: boundaryLayerEffect.z* (1/Math.pow(distanceToParticle,2)) },
+              true
+            );
 
-          // Update turbulent viscosity
-          const deltaNuTilde = production - destruction;
-          const updatedNuTilde = Math.max(0, nuTilde + deltaNuTilde * delta);
+            // Adjust particle velocity to simulate boundary layer drag
+            const dragCoefficient = this.settings.airFriction; // Adjust drag coefficient for boundary layer
+            const velocity = new THREE.Vector3(
+              rigidBody.linvel().x,
+              rigidBody.linvel().y,
+              rigidBody.linvel().z
+            );
 
-          // Apply turbulent viscosity as an additional drag force
-          const turbulentDragForce = velocity.clone().multiplyScalar(-updatedNuTilde);
-          rigidBody.applyImpulse(
-            { x: Math.min(20000, turbulentDragForce.x/1), y: Math.min(1000, turbulentDragForce.y/1), z: Math.min(1, turbulentDragForce.z/10) },
-            true
+            const dragForce = velocity.clone().multiplyScalar(-dragCoefficient);
+            rigidBody.applyImpulse(
+              { x: dragForce.x* (1/Math.pow(distanceToParticle,2)), y: dragForce.y* (1/Math.pow(distanceToParticle,2)), z: dragForce.z* (1/Math.pow(distanceToParticle,2)) },
+              true
+            );
+
+
+            // Update particle colors based on position and velocity
+            const centerlineDistance = translation.y - sphereCenter.y;
+            const dy = centerlineDistance > 0 ? 1 : -1; // Determine direction of the particle relative to the foil
+             // Increase drag proportionally to the foil's rotation
+             const rotationDragFactor = Math.abs(foil.rotation.z) * 0.1; // Adjust the multiplier as needed
+             const rotationDragForce = velocity.clone().multiplyScalar(-rotationDragFactor).length();
+
+            // Apply a force to guide particles along the boundary of the foil
+            const tangentDirection = particlePosition.clone().sub(sphereCenter).normalize().cross(new THREE.Vector3(0, 0, 1)).normalize();
+            const boundaryForceStrength = 5000; // Adjust the strength of the force
+            const boundaryForce = tangentDirection.multiplyScalar(boundaryForceStrength);
+            rigidBody.applyImpulse(
+              { x: rotationDragForce * boundaryForce.x * (1 / Math.pow(distanceToParticle, 2)), y: dy * boundaryForce.y * (1 / Math.pow(distanceToParticle, 2)), z: boundaryForce.z * (1 / Math.pow(distanceToParticle, 2)) },
+              true
+            );
+
+            const tangent = collisionNormal
+              .clone()
+              .cross(new THREE.Vector3(0, 1, 0))
+              .normalize();
+
+            const centerlineOffset = sphereCenterline.clone().sub(sphereCenter);
+            const adjustedTangent = tangent.add(centerlineOffset.normalize()).normalize();
+
+            const tangentImpulse = adjustedTangent.multiplyScalar(0.1); // Adjust the scalar for the desired impulse strength
+            rigidBody.applyImpulse(
+              { x: tangentImpulse.x * (1/Math.pow(distanceToParticle,2)), y: tangentImpulse.y * (1/Math.pow(distanceToParticle,2)), z: tangentImpulse.z * (1/Math.pow(distanceToParticle,2)) },
+              true
+            );
+
+            // Compute distance to the wall (foil surface)
+            const distanceToWall = Math.max(0.01, distanceToParticle - sphereRadius);
+
+            // Compute production term
+            const production = cb1 * nuTilde * Math.pow(velocity.length() / distanceToWall, 2);
+
+            // Compute destruction term
+            const destruction = cw1 * Math.pow(nuTilde / boundaryLayerThickness, 2) * (1 + cw3 * Math.pow(nuTilde / boundaryLayerThickness, 2));
+
+            // Update turbulent viscosity
+            const deltaNuTilde = production - destruction;
+            const updatedNuTilde = Math.max(0, nuTilde + deltaNuTilde * delta);
+
+            // Apply turbulent viscosity as an additional drag force
+            const turbulentDragForce = velocity.clone().multiplyScalar(-updatedNuTilde);
+            rigidBody.applyImpulse(
+              { x: Math.min(5000, turbulentDragForce.x), y: Math.min(500, turbulentDragForce.y), z: Math.min(1, turbulentDragForce.z/10) },
+              true
+            );
+
+            const distanceFactor = Math.min(0.1, (1/Math.pow(distanceToParticle, 3))); // Fall off at the cube of the distance
+            const velocityFactor = Math.max(1, Math.pow(velocity.length(), 2)); // Scale velocity factor
+
+            if (centerlineDistance > 0) {
+              // Above the foil (red)
+              colors[index] = Math.min(1.0 * distanceFactor * velocityFactor, 0.5); // Red increases
+              colors[index + 1] = 0.01; // Green remains constant
+              colors[index + 2] = 0.01; // Blue is zero
+            } else {
+              // Below the foil (blue)
+              colors[index] = 0.01; // Red is zero
+              colors[index + 1] = 0.01; // Green remains constant
+              colors[index + 2] = Math.min(1.0 * distanceFactor * velocityFactor, 1); // Blue increases
+            }
+            break;
+          }
+        }
+
+        // Apply force to the foil based on particle collisions
+        const foilForce = new THREE.Vector3(0, 0, 0);
+
+        for (let j = 0; j < boundingSpheres.length; j++) {
+          const sphereCenter = sphereCenters[j];
+          const sphereRadius = sphereRadii[j];
+
+          const particlePosition = new THREE.Vector3(
+            translation.x,
+            translation.y,
+            translation.z
           );
 
-          // Update particle colors based on position and velocity
-          const velocityMagnitude = velocity.length();
-          const centerlineDistance = translation.y - sphereCenterline.y;
+          const distanceToParticle = sphereCenter.distanceTo(particlePosition);
 
-          const distanceFactor = Math.min(1, 1 / (distanceToParticle^this.settings.distanceF)); // Fall off at the square of the distance
-          const velocityFactor = Math.min(1, velocityMagnitude / this.settings.velocityF); // Scale velocity factor
+          if (distanceToParticle <= sphereRadius) {
+            const collisionNormal = particlePosition.clone().sub(sphereCenter).normalize();
+            const penetrationDepth = sphereRadius - distanceToParticle;
 
-          if (centerlineDistance > 0) {
-            // Above the foil (red)
-            colors[index] = Math.min(1.0 * distanceFactor * velocityFactor, 1); // Red increases
-            colors[index + 1] = 0.01; // Green remains constant
-            colors[index + 2] = 0.01; // Blue is zero
-          } else {
-            // Below the foil (blue)
-            colors[index] = 0.01; // Red is zero
-            colors[index + 1] = 0.01; // Green remains constant
-            colors[index + 2] = Math.min(1.0 * distanceFactor * velocityFactor, 1); // Blue increases
+            // Calculate force based on penetration depth
+            const collisionForce = collisionNormal.multiplyScalar(penetrationDepth * 0.1);
+            foilForce.add(collisionForce);
           }
-          break;
         }
-      }
 
-      // Update particle positions based on rigid body translation
-      positions[index] = translation.x;
-      positions[index + 1] = translation.y;
-      positions[index + 2] = translation.z;
+        // Apply the accumulated force to the foil's position
+        foil.position.y += foilForce.y * 0.001; // Adjust the multiplier for sensitivity
+
+          // Update particle positions based on rigid body translation
+          positions[index] = translation.x;
+          positions[index + 1] = translation.y;
+          positions[index + 2] = translation.z;
       }
 
       particleGeometry.attributes.position.needsUpdate = true;

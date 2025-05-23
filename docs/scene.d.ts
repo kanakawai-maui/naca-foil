@@ -10,12 +10,14 @@ export declare class Scene {
         compareNacaCode: string;
         particleSize: number;
         showWireframe: boolean;
+        showBoundaryLines: boolean;
         particleSpeed: number;
         airFriction: number;
         particleCount: number;
         particleOpacity: number;
-        distanceF: number;
-        velocityF: number;
+        turbulentViscosity: number;
+        boundaryLayerSize: number;
+        compareNacaPositionX: number;
         reset: () => void;
     };
     renderer: THREE.WebGLRenderer;
