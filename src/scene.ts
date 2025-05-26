@@ -450,11 +450,14 @@ export class Scene {
       const rigidBody = particleBodies[i];
       const newX = Math.random() * 200 - 100; // Reset to a random position between -100 and 100
       const theta = Math.random() * Math.PI * 2; // Random angle in radians
-      const phi = Math.random() * Math.PI * 2; // Random angle in radians
+      const phi = Math.random() * Math.PI; // Random angle in radians
       const radius = 20; // Radius for spherical coordinates
       const newY = radius * Math.sin(phi) * Math.sin(theta); // Y coordinate
       const newZ = radius * Math.cos(phi); // Z coordinate
       rigidBody.setTranslation({ x: newX, y: newY, z: newZ }, true);
+      rigidBody.setLinvel({ x: 0, y: 0, z: 0 }, true); // Reset linear velocity
+      rigidBody.setAngvel({ x: 0, y: 0, z: 0 }, true); // Reset angular velocity
+      rigidBody.addForce({ x: this.settings.particleSpeed/2, y: 0, z: 0 }, true); // Reset velocity
     }
 
     // Create a group of overlapping bounding spheres representing the foil
@@ -599,19 +602,6 @@ export class Scene {
 
     adjustFoilRotation();
 
-    // Add gravity to the foil
-    const gravity = new THREE.Vector3(0, -9.8, 0); // Gravity vector
-
-    const foilMass = 100; // Adjust the mass of the foil as needed
-    const gravityForce = gravity.clone().multiplyScalar(foilMass);
-
-    /*
-    const applyGravityToFoil = (delta) => {
-      // Apply gravity to the foil's position
-      foil.position.y += gravityForce.y * delta * 0.001; // Adjust multiplier for sensitivity
-    };
-    */
-
     const animate = () => {
       requestAnimationFrame(animate);
       const delta = this.clock.getDelta();
@@ -644,11 +634,19 @@ export class Scene {
         new THREE.Vector3(0, 0, 0)
       ).divideScalar(boundingSpheres.length);
 
+      let updatedNuTilde = 0.5; // Turbulent viscosity (adjust as needed)
+
       // Sync particle positions with Rapier rigid bodies
       for (let i = 0; i < particleCount; i++) {
         const rigidBody = particleBodies[i];
         const translation = rigidBody.translation();
         const index = i * 3;
+
+        const particlePosition = new THREE.Vector3(
+          translation.x,
+          translation.y,
+          translation.z
+        );
 
         // Apply air friction to the particle's velocity
         rigidBody.setLinearDamping(linearDamping); // Set linear damping for air resistance
@@ -694,14 +692,14 @@ export class Scene {
           const radius = 10; // Radius for spherical coordinates
           const newY = radius * Math.sin(phi) * Math.sin(theta); // Y coordinate
           const newZ = radius * Math.cos(phi); // Z coordinate
-
+          rigidBody.setLinvel({ x: 0, y: 0, z: 0 }, true); // Reset linear velocity
+          rigidBody.setAngvel({ x: 0, y: 0, z: 0 }, true); // Reset angular velocity
           rigidBody.setTranslation({ x: newX, y: newY, z: newZ }, true);
+          rigidBody.addForce({ x: this.settings.particleSpeed * delta, y: 0, z: 0 }, true); // Reset velocity
           colors[index] = 0.01; // Red
           colors[index + 1] = 0.01; // Green
           colors[index + 2] = 0.01; // Blue
-        } else {
-          rigidBody.setTranslation({ x: newX, y: translation.y, z: translation.z }, true);
-        }
+        } 
 
         // Apply Spalart-Allmaras turbulence model
         const nuTilde = this.settings.turbulentViscosity || 0.1; // Turbulent viscosity (adjust as needed)
@@ -710,103 +708,40 @@ export class Scene {
         const cw1 = cb1 / (sigma ** 2); // Model constant
         const cw3 = 2.0; // Model constant
 
-        // Check for collisions with bounding spheres
-        for (let j = 0; j < boundingSpheres.length; j++) {
-          const sphereCenter = sphereCenters[j];
-          const sphereRadius = sphereRadii[j];
 
-          const particlePosition = new THREE.Vector3(
-            translation.x,
-            translation.y,
-            translation.z
-          );
+        let sphereCenter = sphereCenters[0];
+        let sphereRadius = sphereRadii[0];
+        const boundaryLayerThickness = Math.max(0.01, sphereRadius * this.settings.boundaryLayerSize); // Approximate boundary layer thickness
 
-          // Factor in boundary layer dynamics
-          const boundaryLayerThickness = Math.max(0.01, sphereRadius * this.settings.boundaryLayerSize); // Approximate boundary layer thickness
-          const distanceToParticle = sphereCenter.distanceTo(particlePosition);
-          
+        let distanceToParticle = sphereCenter.distanceTo(particlePosition);
 
-          if (distanceToParticle <= 20) {
+        const velocity = new THREE.Vector3(
+          rigidBody.linvel().x,
+          rigidBody.linvel().y,
+          rigidBody.linvel().z
+        );
 
-            if(translation.x > sphereCenter.x + sphereRadius + boundaryLayerThickness) {
-              break;
+        // Update particle colors based on position and velocity
+        let centerlineDistance = translation.y - sphereCenter.y;
+
+        
+
+        if (!(particlePosition.x > sphereCenter.x + sphereRadius + boundaryLayerThickness)) {
+            for (let j = 0; j < boundingSpheres.length; j++) {
+              if (distanceToParticle > sphereRadii[j] + boundaryLayerThickness) {
+                continue; // Skip this particle if it's outside the bounding sphere
+              } else  {
+                if(particlePosition.x < sphereCenter.x - sphereRadius - boundaryLayerThickness) {
+                  sphereCenter = sphereCenters[j];
+                  sphereRadius = sphereRadii[j];
+                  distanceToParticle = sphereCenter.distanceTo(particlePosition);
+                  centerlineDistance = particlePosition.y - sphereCenter.y;
+                } 
+                 
+                  
+                
+              }
             }
-
-            // Calculate impulse based on collision normal
-            const collisionNormal = particlePosition.clone().sub(sphereCenter).normalize();
-            const penetrationDepth = sphereRadius + boundaryLayerThickness - distanceToParticle;
-
-            // Apply boundary layer effect
-            const boundaryLayerEffect = collisionNormal.multiplyScalar(penetrationDepth * 0.5);
-            rigidBody.applyImpulse(
-              { x: boundaryLayerEffect.x * (1/Math.pow(distanceToParticle,2)), y: boundaryLayerEffect.y* (1/Math.pow(distanceToParticle,2)), z: boundaryLayerEffect.z* (1/Math.pow(distanceToParticle,2)) },
-              true
-            );
-
-            // Adjust particle velocity to simulate boundary layer drag
-            const dragCoefficient = this.settings.airFriction; // Adjust drag coefficient for boundary layer
-            const velocity = new THREE.Vector3(
-              rigidBody.linvel().x,
-              rigidBody.linvel().y,
-              rigidBody.linvel().z
-            );
-
-            const dragForce = velocity.clone().multiplyScalar(-dragCoefficient);
-            rigidBody.applyImpulse(
-              { x: dragForce.x* (1/Math.pow(distanceToParticle,2)), y: dragForce.y* (1/Math.pow(distanceToParticle,2)), z: dragForce.z* (1/Math.pow(distanceToParticle,2)) },
-              true
-            );
-
-
-            // Update particle colors based on position and velocity
-            const centerlineDistance = translation.y - sphereCenter.y;
-            const dy = centerlineDistance > 0 ? 1 : -1; // Determine direction of the particle relative to the foil
-             // Increase drag proportionally to the foil's rotation
-             const rotationDragFactor = Math.abs(foil.rotation.z) * 0.1; // Adjust the multiplier as needed
-             const rotationDragForce = velocity.clone().multiplyScalar(-rotationDragFactor).length();
-
-            // Apply a force to guide particles along the boundary of the foil
-            const tangentDirection = particlePosition.clone().sub(sphereCenter).normalize().cross(new THREE.Vector3(0, 0, 1)).normalize();
-            const boundaryForceStrength = 5000; // Adjust the strength of the force
-            const boundaryForce = tangentDirection.multiplyScalar(boundaryForceStrength);
-            rigidBody.applyImpulse(
-              { x: rotationDragForce * boundaryForce.x * (1 / Math.pow(distanceToParticle, 2)), y: dy * boundaryForce.y * (1 / Math.pow(distanceToParticle, 2)), z: boundaryForce.z * (1 / Math.pow(distanceToParticle, 2)) },
-              true
-            );
-
-            const tangent = collisionNormal
-              .clone()
-              .cross(new THREE.Vector3(0, 1, 0))
-              .normalize();
-
-            const centerlineOffset = sphereCenterline.clone().sub(sphereCenter);
-            const adjustedTangent = tangent.add(centerlineOffset.normalize()).normalize();
-
-            const tangentImpulse = adjustedTangent.multiplyScalar(0.1); // Adjust the scalar for the desired impulse strength
-            rigidBody.applyImpulse(
-              { x: tangentImpulse.x * (1/Math.pow(distanceToParticle,2)), y: tangentImpulse.y * (1/Math.pow(distanceToParticle,2)), z: tangentImpulse.z * (1/Math.pow(distanceToParticle,2)) },
-              true
-            );
-
-            // Compute distance to the wall (foil surface)
-            const distanceToWall = Math.max(0.01, distanceToParticle - sphereRadius);
-
-            // Compute production term
-            const production = cb1 * nuTilde * Math.pow(velocity.length() / distanceToWall, 2);
-
-            // Compute destruction term
-            const destruction = cw1 * Math.pow(nuTilde / boundaryLayerThickness, 2) * (1 + cw3 * Math.pow(nuTilde / boundaryLayerThickness, 2));
-
-            // Update turbulent viscosity
-            const deltaNuTilde = production - destruction;
-            const updatedNuTilde = Math.max(0, nuTilde + deltaNuTilde * delta);
-
-            // Apply turbulent viscosity as an additional drag force
-            const turbulentDragForce = velocity.clone().multiplyScalar(-updatedNuTilde);
-            rigidBody.applyImpulse(
-              { x: Math.min(5000, turbulentDragForce.x), y: Math.min(500, turbulentDragForce.y), z: Math.min(1, turbulentDragForce.z/10) },
-              true
-            );
 
             const distanceFactor = Math.min(0.1, (1/Math.pow(distanceToParticle, 3))); // Fall off at the cube of the distance
             const velocityFactor = Math.max(1, Math.pow(velocity.length(), 2)); // Scale velocity factor
@@ -822,9 +757,61 @@ export class Scene {
               colors[index + 1] = 0.01; // Green remains constant
               colors[index + 2] = Math.min(1.0 * distanceFactor * velocityFactor, 1); // Blue increases
             }
-            break;
+
+            // Compute production term  
+            const production = cb1 * nuTilde * Math.pow(velocity.length() / 1000, 2);
+
+            // Compute destruction term
+            const destruction = cw1 * Math.pow(nuTilde / boundaryLayerThickness, 2) * (1 + cw3 * Math.pow(nuTilde / boundaryLayerThickness, 2));
+
+            // Update turbulent viscosity
+            const deltaNuTilde = production - destruction;
+            updatedNuTilde = Math.max(0, nuTilde + deltaNuTilde * delta);
+
+            // Apply turbulent viscosity as an additional drag force
+            const turbulentDragForce = velocity.clone().multiplyScalar(-updatedNuTilde);
+            rigidBody.applyImpulse(
+              { x: Math.min(50, turbulentDragForce.x), y: Math.min(500, turbulentDragForce.y), z: Math.min(1, turbulentDragForce.z/1) },
+              true
+            );
+
+
+
+            // Calculate impulse based on collision normal
+            const collisionNormal = particlePosition.clone().sub(sphereCenter).normalize();
+            const penetrationDepth = sphereRadius + boundaryLayerThickness - distanceToParticle;
+
+            // Apply boundary layer effect
+            const boundaryLayerEffect = collisionNormal.multiplyScalar(penetrationDepth * 0.5);
+            rigidBody.applyImpulse(
+              { x: boundaryLayerEffect.x * (1/Math.pow(distanceToParticle,2)), y: boundaryLayerEffect.y* (1/Math.pow(distanceToParticle,2)), z: boundaryLayerEffect.z* (1/Math.pow(distanceToParticle,2)) },
+              true
+            );
+
+            // Adjust particle velocity to simulate boundary layer drag
+            const dragCoefficient = this.settings.airFriction; // Adjust drag coefficient for boundary layer
+
+            const dragForce = velocity.clone().multiplyScalar(-dragCoefficient);
+            rigidBody.applyImpulse(
+              { x: dragForce.x* (1/Math.pow(distanceToParticle,2)), y: dragForce.y* (1/Math.pow(distanceToParticle,2)), z: dragForce.z* (1/Math.pow(distanceToParticle,2)) },
+              true
+            );
+
+            const dy = centerlineDistance > 0 ? 1 : -1; // Determine direction of the particle relative to the foil
+             // Increase drag proportionally to the foil's rotation
+             const rotationDragFactor = Math.abs(foil.rotation.z) * 0.1; // Adjust the multiplier as needed
+             const rotationDragForce = velocity.clone().multiplyScalar(-rotationDragFactor).length();
+
+            // Apply a force to guide particles along the boundary of the foil
+            const tangentDirection = particlePosition.clone().sub(sphereCenter).normalize().cross(new THREE.Vector3(0, 0, 1)).normalize();
+            const boundaryForceStrength = 1000; // Adjust the strength of the force
+            const boundaryForce = tangentDirection.multiplyScalar(boundaryForceStrength);
+            rigidBody.applyImpulse(
+              { x: rotationDragForce * boundaryForce.x * (1 / Math.pow(distanceToParticle, 2)), y: dy * boundaryForce.y * (1 / Math.pow(distanceToParticle, 2)), z: boundaryForce.z * (1 / Math.pow(distanceToParticle, 3)) },
+              true
+            );
+            
           }
-        }
 
         // Apply force to the foil based on particle collisions
         const foilForce = new THREE.Vector3(0, 0, 0);
@@ -838,8 +825,6 @@ export class Scene {
             translation.y,
             translation.z
           );
-
-          const distanceToParticle = sphereCenter.distanceTo(particlePosition);
 
           if (distanceToParticle <= sphereRadius) {
             const collisionNormal = particlePosition.clone().sub(sphereCenter).normalize();
