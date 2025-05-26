@@ -30,6 +30,7 @@ export class Scene {
     particleCount: number;
     particleOpacity: number;
     turbulentViscosity: number;
+    boundaryForceSize: number;
     boundaryLayerSize: number;
     compareNacaPositionX: number;
     reset: () => void;
@@ -88,6 +89,8 @@ export class Scene {
     console.log("Saved show boundary lines:", savedShowBoundaryLines);
     const savedCompareNacaPositionX = localStorage.getItem("compareNacaPositionX") || '10';
     console.log("Saved compare NACA position X:", savedCompareNacaPositionX);
+    const savedBoundaryForceSize = localStorage.getItem("boundaryForceSize") || '1000';
+    console.log("Saved boundary force size:", savedBoundaryForceSize);
     
     this.settings = {
       nacaCode: savedNacaCode || "2412",
@@ -103,6 +106,7 @@ export class Scene {
       turbulentViscosity: parseFloat(savedTurbulentViscosity) || 0.1,
       boundaryLayerSize: parseFloat(savedBoundaryLayerSize) || 0.1,
       compareNacaPositionX: parseFloat(savedCompareNacaPositionX) || 10,
+      boundaryForceSize: parseFloat(savedBoundaryForceSize) || 1000,
       reset: () => {
         localStorage.removeItem("nacaCode");
         localStorage.removeItem("airFriction");
@@ -116,6 +120,7 @@ export class Scene {
         localStorage.removeItem("boundaryLayerSize");
         localStorage.removeItem("showBoundaryLines");
         localStorage.removeItem("compareNacaPositionX");
+        localStorage.removeItem("boundaryForceSize");
         location.reload(); // Refresh the page
       },
     };
@@ -161,12 +166,15 @@ export class Scene {
       gui.add(this.settings, "airFriction", 0, 1, 0.01).name("Drag Coefficient").onChange((newValue: number) => {
         localStorage.setItem("airFriction", newValue.toString()); // Save the new value to localStorage
       });
-      gui.add(this.settings, "turbulentViscosity", 0, 0.99, 0.01).name("Turbulent Viscosity").onChange((newValue: number) => {
-        localStorage.setItem("turbulentViscosity", newValue.toString()); // Save the new value to localStorage
+      gui.add(this.settings, "boundaryForceSize", 500, 10000, 500).name("Bound. Force Size").onChange((newValue: number) => {
+        localStorage.setItem("boundaryForceSize", newValue.toString()); // Save the new value to localStorage
       });
       gui.add(this.settings, "boundaryLayerSize", 0, 1, 0.01).name("Bound. Layer Size").onChange((newValue: number) => {
         localStorage.setItem("boundaryLayerSize", newValue.toString()); // Save the new value to localStorage
         location.reload(); // Refresh the page
+      });
+      gui.add(this.settings, "turbulentViscosity", 0, 1, 0.01).name("Turbulent Viscosity").onChange((newValue: number) => {
+        localStorage.setItem("turbulentViscosity", newValue.toString()); // Save the new value to localStorage
       });
       gui.add(this.settings, "showBoundaryLines").name("Boundary Lines").onChange((newValue: boolean) => {
         localStorage.setItem("showBoundaryLines", newValue.toString()); // Save the new value to localStorage
@@ -804,7 +812,7 @@ export class Scene {
 
             // Apply a force to guide particles along the boundary of the foil
             const tangentDirection = particlePosition.clone().sub(sphereCenter).normalize().cross(new THREE.Vector3(0, 0, 1)).normalize();
-            const boundaryForceStrength = 1000; // Adjust the strength of the force
+            const boundaryForceStrength = this.settings.boundaryForceSize; // Adjust the strength of the force
             const boundaryForce = tangentDirection.multiplyScalar(boundaryForceStrength);
             rigidBody.applyImpulse(
               { x: rotationDragForce * boundaryForce.x * (1 / Math.pow(distanceToParticle, 2)), y: dy * boundaryForce.y * (1 / Math.pow(distanceToParticle, 2)), z: boundaryForce.z * (1 / Math.pow(distanceToParticle, 3)) },

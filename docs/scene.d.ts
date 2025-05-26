@@ -16,6 +16,7 @@ export declare class Scene {
         particleCount: number;
         particleOpacity: number;
         turbulentViscosity: number;
+        boundaryForceSize: number;
         boundaryLayerSize: number;
         compareNacaPositionX: number;
         reset: () => void;
